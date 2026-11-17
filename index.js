@@ -39,12 +39,15 @@ app.use((req, res, next) => {
 
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 app.get("/api/logs", (req, res) => res.json({ logs: getLogs() }));
+app.get("/api/logs/download", (req, res) =>
+  res.download(path.join(__dirname, "logs", "bot.log"), "bot.log", (err) => { if (err && !res.headersSent) res.status(404).send("Belum ada log"); }));
 
 app.get("/api/config", (req, res) => {
   const c = JSON.parse(JSON.stringify(config));
   if (c["bot-account"]?.password) c["bot-account"].password = SECRET;
   if (c.utils?.["auto-auth"]?.password) c.utils["auto-auth"].password = SECRET;
   if (c.discord?.webhookUrl) c.discord.webhookUrl = SECRET;
+  if (c.telegram?.token) c.telegram.token = SECRET;
   res.json(c);
 });
 
@@ -1080,11 +1083,15 @@ app.post("/command", (req, res) => {
   if (cmd === "/help") {
     const lines = [
       "/help  /pos  /status  /list  /say <msg>",
+      "/goto x y z  /follow <player>  /come <player>  /stop",
       "/<anything> = Minecraft command, plain text = chat",
     ];
     lines.forEach((l) => addLog(`[Console] ${l}`));
     return res.json({ success: true, msg: lines.join("\n") });
   }
+
+  const mv = require("./extras").command(cmd, targets);
+  if (mv) { mv.forEach((l) => addLog(`[Console] ${l}`)); return res.json({ success: true, msg: mv.join("\n") }); }
 
   const out = targets.map((b) => {
     const bot = b.bot, st = b.botState;
@@ -1187,8 +1194,17 @@ function makeBot(id, account, baseConfig) {
   const config = Object.assign({}, baseConfig, {
     "bot-account": Object.assign({}, baseConfig["bot-account"], account),
   });
+  if (baseConfig.modules && baseConfig.modules.survival) {
+    // survival replaces random walking / blind combat, which would fight over the pathfinder
+    config.movement = Object.assign({}, baseConfig.movement, { enabled: false });
+    config.position = Object.assign({}, baseConfig.position, { enabled: false });
+    config.modules = Object.assign({}, baseConfig.modules, { avoidMobs: false, combat: false });
+    config.utils = Object.assign({}, baseConfig.utils, { "anti-afk": { enabled: false } });
+  }
   let botRunning = false;
   const botState = {
+    lastIssue: "",
+    drops: 0,
     connected: false,
     connectedAt: 0,
     lastActivity: Date.now(),
@@ -1316,7 +1332,14 @@ function makeBot(id, account, baseConfig) {
         botState.connected = true;
         botState.connectedAt = Date.now();
         botState.lastActivity = Date.now();
-        botState.reconnectAttempts = 0;
+        const upAt = botState.connectedAt;
+        setTimeout(() => {
+          if (botState.connected && botState.connectedAt === upAt) {
+            botState.reconnectAttempts = 0;
+            botState.drops = 0;
+            botState.lastIssue = "";
+          }
+        }, 60000);
         isReconnecting = false;
 
         addLog(
@@ -1368,6 +1391,12 @@ function makeBot(id, account, baseConfig) {
         const kickReason =
           typeof reason === "object" ? JSON.stringify(reason) : reason;
         addLog(`[Bot] Kicked: ${kickReason}`);
+      botState.lastIssue = "Kicked: " + String(kickReason).slice(0, 110);
+      if (/another location|already (online|logged|connected)|duplicate_login|same name/i.test(String(kickReason))) {
+        botState.wasThrottled = true;
+        botState.lastIssue = "Username dipakai di tempat lain (bot dobel?) - matikan salah satu";
+        addLog("[Bot] Duplicate login: username ini sedang online dari tempat lain. Matikan bot yang dobel.");
+      }
         botState.connected = false;
         botState.errors.push({
           type: "kicked",
@@ -1401,6 +1430,8 @@ function makeBot(id, account, baseConfig) {
       // FIX: 'end' is the single reconnect trigger
       bot.on("end", (reason) => {
         addLog(`[Bot] Disconnected: ${reason || "Unknown reason"}`);
+      botState.drops++;
+      if (!botState.lastIssue) botState.lastIssue = "Putus: " + String(reason || "unknown").slice(0, 80);
         botState.connected = false;
         clearAllIntervals();
         spawnHandled = false; // reset for next connection
@@ -1423,6 +1454,7 @@ function makeBot(id, account, baseConfig) {
       bot.on("error", (err) => {
         const msg = err.message || "";
         addLog(`[Bot] Error: ${msg}`);
+      botState.lastIssue = "Error: " + msg.slice(0, 100);
         botState.errors.push({ type: "error", message: msg, time: Date.now() });
         // Don't reconnect on error - let 'end' event handle it
       });
@@ -1691,6 +1723,8 @@ function makeBot(id, account, baseConfig) {
     if (config.modules.chat) {
       chatModule(bot);
     }
+    if (config.modules.survival) require("./survival")(bot, mcData, defaultMove, addLog, addInterval);
+    try { require("./extras").attach(bot, mcData, defaultMove, addLog, addInterval, config, botState); } catch (e) { addLog("[Extras] " + e.message); }
 
     addLog("[Modules] All modules initialized!");
   }
@@ -1973,7 +2007,10 @@ function makeBot(id, account, baseConfig) {
   }
 
   // Used by crash handlers
+  let recovering = false;
   function recover(delay) {
+    if (recovering || !botRunning) return;
+    recovering = true;
     clearAllIntervals();
     botState.connected = false;
     if (isReconnecting) {
@@ -1983,7 +2020,7 @@ function makeBot(id, account, baseConfig) {
         reconnectTimeoutId = null;
       }
     }
-    setTimeout(scheduleReconnect, delay);
+    setTimeout(() => { recovering = false; scheduleReconnect(); }, delay);
   }
 
   return {
@@ -2027,7 +2064,12 @@ const manager = {
       connected: b.botState.connected,
       coords: b.bot && b.bot.entity ? b.bot.entity.position : null,
       reconnects: b.botState.reconnectAttempts,
+      issue: b.botState.lastIssue,
+      drops: b.botState.drops,
       uptime: b.botState.connected ? Math.floor((Date.now() - b.botState.connectedAt) / 1000) : 0,
+      hp: b.bot && b.bot.health != null ? Math.round(b.bot.health) : null,
+      food: b.bot && b.bot.food != null ? b.bot.food : null,
+      items: b.botState.connected && b.bot && b.bot.inventory ? b.bot.inventory.items().slice(0, 40).map((i) => i.name.replace(/_/g, " ") + " ×" + i.count) : [],
     }));
   },
 };
@@ -2035,6 +2077,7 @@ const manager = {
 // ============================================================
 // CONSOLE COMMANDS (terminal) - applies to every connected bot
 // ============================================================
+require("./extras").telegram(manager, config, addLog);
 const readline = require("readline");
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
 
