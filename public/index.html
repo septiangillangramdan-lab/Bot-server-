@@ -6,8 +6,8 @@
 <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="#0e1530"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Pixelify+Sans:wght@500;700&display=swap">
 <style>
-:root{color-scheme:light;--bg:#d9edf7;--panel:#f6f8f4;--ink:#2b2118;--mu:#566150;--edge:#2b2118;--field:#fff;--line:#c3cdb9;--stone:#dfe5d8;--hi:#ffffff80;--lo:#0000002e;--grass:#3f8524;--red:#b3321f;--lapis:#2f5fc4;--ok:#3f8524;--wait:#c98a00;--bad:#b3321f;--warn:#8a5d00;--sky:#8ec9ee;--sky2:#bfe3f7;--term:#0b1020;--termink:#a7b2d6}
-:root[data-theme=dark]{color-scheme:dark;--bg:#0e1530;--panel:#172044;--ink:#e8ecff;--mu:#9aa6d6;--edge:#05081a;--field:#0b1129;--line:#2b3868;--stone:#26335f;--hi:#ffffff1f;--lo:#00000066;--lapis:#8fb0ff;--ok:#7bd957;--wait:#ffd34d;--bad:#ff6b5e;--warn:#ffd34d;--sky:#16224d;--sky2:#0e1838}
+:root{color-scheme:light;--bg:#d9edf7;--panel:#f6f8f4;--ink:#2b2118;--mu:#566150;--edge:#2b2118;--field:#fff;--line:#c3cdb9;--stone:#dfe5d8;--hi:#ffffff80;--lo:#0000002e;--grass:#3f8524;--red:#b3321f;--lapis:#2f5fc4;--ok:#3f8524;--wait:#c98a00;--bad:#b3321f;--warn:#8a5d00;--slot:#b7bfae;--sky:#8ec9ee;--sky2:#bfe3f7;--term:#0b1020;--termink:#a7b2d6}
+:root[data-theme=dark]{color-scheme:dark;--bg:#0e1530;--panel:#172044;--ink:#e8ecff;--mu:#9aa6d6;--edge:#05081a;--field:#0b1129;--line:#2b3868;--stone:#26335f;--hi:#ffffff1f;--lo:#00000066;--lapis:#8fb0ff;--ok:#7bd957;--wait:#ffd34d;--bad:#ff6b5e;--warn:#ffd34d;--slot:#0b1129;--sky:#16224d;--sky2:#0e1838}
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Figtree,system-ui,sans-serif;padding:calc(12px + env(safe-area-inset-top)) 14px calc(96px + env(safe-area-inset-bottom))}
@@ -115,8 +115,34 @@ details.mu summary{cursor:pointer;padding:4px 0}
 .skel{height:96px;background:linear-gradient(90deg,var(--stone) 0 40%,var(--panel) 50%,var(--stone) 60%) 0 0/300% 100%;animation:sk 1.4s linear infinite;margin-bottom:14px;box-shadow:0 0 0 2px var(--edge)}
 @keyframes sk{to{background-position:-300% 0}}
 
+/* inventory visual */
+#invdlg{max-width:min(470px,calc(100% - 16px));padding:14px}
+.inv-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.inv-top h2{flex:1;min-width:0;overflow-wrap:anywhere}
+.inv-h{margin:12px 0 4px;font-size:12px;color:var(--mu)}
+.ig{display:grid;grid-template-columns:repeat(9,1fr);gap:3px}
+.ig .lb{grid-row:1;text-align:center;font-size:10px;color:var(--mu);line-height:1.2;margin-bottom:2px}
+.slot{position:relative;aspect-ratio:1;min-width:0;padding:0;border:0;cursor:pointer;background:var(--slot);box-shadow:0 0 0 1px var(--edge),inset 2px 2px 0 var(--lo),inset -2px -2px 0 var(--hi);color:var(--ink)}
+.slot:disabled{cursor:default}
+.slot.sel{outline:3px solid var(--lapis);outline-offset:1px;z-index:1}
+.slot.held{box-shadow:0 0 0 2px #f2c230,inset 2px 2px 0 var(--lo),inset -2px -2px 0 var(--hi)}
+.ic{position:absolute;inset:10%;display:block}
+.ic img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated;display:block}
+.ic.tile{display:grid;place-items:center;font:700 11px 'Pixelify Sans',monospace;color:#fff;text-shadow:1px 1px 0 #0008;box-shadow:inset 2px 2px 0 #fff4,inset -2px -2px 0 #0004}
+.cnt{position:absolute;right:2px;bottom:0;font:700 12px 'Pixelify Sans',monospace;color:#fff;text-shadow:1px 1px 0 #000,-1px -1px 0 #000,1px -1px 0 #000,-1px 1px 0 #000;pointer-events:none}
+.dur{position:absolute;left:12%;right:12%;bottom:3px;height:3px;background:#000a}
+.dur i{display:block;height:100%}
+.det{margin-top:14px;padding:10px;background:var(--stone);box-shadow:inset 2px 2px 0 var(--lo),inset -2px -2px 0 var(--hi);min-height:84px}
+.det-h{display:flex;gap:10px;align-items:center;margin-bottom:8px}
+.det-h .slot{width:44px;flex:none;pointer-events:none}
+.det-h b{font-family:'Pixelify Sans',monospace;font-size:16px;overflow-wrap:anywhere}
+.det .acts{margin-top:6px}
+.det .acts .btn{flex:1 1 auto;min-width:84px}
+
 /* server, riwayat, statistik */
 .cols{display:grid;gap:16px}
+.f2{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+.srvitem+.srvitem{margin-top:14px;padding-top:12px;border-top:2px dashed var(--line)}
 .srv-h{display:flex;align-items:center;gap:10px;margin-bottom:6px}
 .dotp{width:14px;height:14px;background:var(--bad);box-shadow:0 0 0 2px var(--edge);flex:none}.dotp.on{background:var(--ok)}
 .motd{margin:8px 0;padding:8px 10px;background:var(--term);color:#d4daf2;font:13px/1.4 ui-monospace,Menlo,monospace;overflow-wrap:anywhere}
@@ -217,7 +243,7 @@ dialog .row .btn{flex:1}
         <div><div class="big" id="st">Memuat…</div><div class="mu" id="sd"></div></div></div>
       <div class="stats">
         <div class="stat"><span class="mu">Bot online</span><b id="cnt">—</b><small id="cnt2">&nbsp;</small></div>
-        <div class="stat"><span class="mu">Pemain di server</span><b id="ply">—</b><small id="ply2">&nbsp;</small></div>
+        <div class="stat"><span class="mu">Pemain (server utama)</span><b id="ply">—</b><small id="ply2">&nbsp;</small></div>
         <div class="stat"><span class="mu">Panel aktif</span><b id="pup">—</b><small id="srv">&nbsp;</small></div>
       </div>
     </div>
@@ -230,9 +256,23 @@ dialog .row .btn{flex:1}
   </div>
 
   <div class="bots" id="bots"><div class="skel"></div></div>
-  <div class="panel"><h3>Tambah bot</h3>
-    <div class="row"><input type="text" id="newbot" placeholder="Username (3–16 huruf, angka, _)" autocapitalize="off" autocomplete="off" aria-label="Username bot baru" maxlength="16"><button class="btn go" id="add">Tambah bot</button></div>
-  </div>
+  <form class="panel" id="botform" autocomplete="off">
+    <h2 id="bf-title">Tambah bot</h2>
+    <p class="mu" id="bf-hint">Setiap bot bisa masuk ke server berbeda dan punya pesan otomatis sendiri. Kosongkan untuk memakai pengaturan utama.</p>
+    <label for="bf-name">Username</label>
+    <input type="text" id="bf-name" placeholder="3–16 huruf, angka, atau _" autocapitalize="off" maxlength="16">
+    <div class="f2">
+      <div><label for="bf-ip">IP / hostname server</label><input type="text" id="bf-ip" autocapitalize="off" spellcheck="false"></div>
+      <div><label for="bf-port">Port</label><input type="number" id="bf-port" inputmode="numeric" placeholder="25565"></div>
+    </div>
+    <label for="bf-ver">Versi (kosongkan = otomatis)</label>
+    <input type="text" id="bf-ver" placeholder="mis. 1.20.1">
+    <label for="bf-msgs">Pesan otomatis (satu per baris)</label>
+    <textarea id="bf-msgs" rows="3" placeholder="Kosong = pakai pesan dari Pengaturan"></textarea>
+    <label for="bf-delay">Jeda antar pesan (detik)</label>
+    <input type="number" id="bf-delay" inputmode="numeric" min="5" placeholder="Ikut pengaturan utama">
+    <div class="row" style="margin-top:16px"><button type="button" class="btn" id="bf-cancel" hidden>Batal</button><button type="submit" class="btn go" id="bf-ok" style="flex:1">Tambah bot</button></div>
+  </form>
 
   <div class="cols">
     <div class="panel" id="srvcard"><h2>Server</h2><p class="mu">Memeriksa server…</p></div>
@@ -351,6 +391,7 @@ dialog .row .btn{flex:1}
   <div class="msg"><b>Ada perubahan</b><span class="mu">Bot akan restart saat disimpan.</span></div>
   <button class="btn sm" id="revert">Batalkan</button><button class="btn go" id="save">Simpan &amp; restart</button>
 </div>
+<dialog id="invdlg" aria-labelledby="inv-t"><div class="inv-top"><h2 id="inv-t">Inventory</h2><button class="btn sm" id="inv-x">Tutup</button></div><div id="inv-body"><p class="mu">Memuat…</p></div></dialog>
 <div id="toasts" role="status" aria-live="polite"></div>
 <dialog id="dlg"><form method="dialog"><h2 id="dlg-t"></h2><p id="dlg-p" class="mu"></p><input type="text" id="dlg-i" hidden aria-label="Isian"><div class="row"><button class="btn" value="no" id="dlg-no">Batal</button><button class="btn go" value="ok" id="dlg-ok">OK</button></div></form></dialog>
 
@@ -440,9 +481,11 @@ function renderWorld(){
 }
 function botCard(b,OP){
   const s=b.connected?'on':b.running?'wait':'off',ch=[];
+  ch.push(b.server);
   if(b.connected){
     if(b.dim)ch.push(DIM[b.dim]||b.dim);
     if(b.ping!=null)ch.push(b.ping+' ms');
+    if(b.msgs)ch.push(b.msgs+' pesan otomatis');
     if(b.players!=null)ch.push(b.players+' pemain di tab');
     if(b.xp!=null)ch.push('Lv '+b.xp);
     if(b.gm)ch.push(b.gm);
@@ -453,11 +496,12 @@ function botCard(b,OP){
   el.innerHTML='<div class="bot-h"><div class="av '+s+'">'+face(b.id)+'<i></i></div><div class="info"><b>'+esc(b.id)+'</b>'+(b.main?'<span class="tag">utama</span>':'')+'<div class="mu">'+esc(where)+'</div></div></div>'
    +(b.hp!=null?'<div class="vit">'+vbar(b.hp,'hp')+vbar(b.food==null?0:b.food,'food')+'</div>':'')
    +(ch.length?'<div class="chips">'+ch.map(x=>'<span class="chip">'+esc(x)+'</span>').join('')+'</div>':'')
-   +(b.items&&b.items.length?'<details class="mu" data-id="'+esc(b.id)+'"'+(OP.has(b.id)?' open':'')+'><summary>Inventory ('+b.items.length+')</summary>'+b.items.map(esc).join(', ')+'</details>':'')
    +(b.near&&b.near.length?'<details class="mu" data-id="n:'+esc(b.id)+'"'+(OP.has('n:'+b.id)?' open':'')+'><summary>Sekitar ('+b.near.length+')</summary>'+b.near.map(n=>esc(n.n)+' '+n.d+' m'+(n.k==='player'?' 👤':'')).join(', ')+'</details>':'')
    +(b.issue?'<div class="warn">⚠ '+esc(b.issue)+(b.drops>1?' (putus '+b.drops+'×)':'')+'</div>':'')
    +'<div class="acts"><button class="btn sm '+(b.running?'stop':'go')+'" data-id="'+esc(b.id)+'" data-a="'+(b.running?'stop':'start')+'">'+(b.running?'Hentikan':'Nyalakan')+'</button>'
+   +(b.connected?'<button class="btn sm" data-id="'+esc(b.id)+'" data-a="inv">Inventory</button>':'')
    +(b.running?'<button class="btn sm" data-id="'+esc(b.id)+'" data-a="restart">Restart</button>':'')
+   +(b.main?'':'<button class="btn sm" data-id="'+esc(b.id)+'" data-a="edit">Edit</button>')
    +(b.main?'':'<button class="btn sm sq" data-id="'+esc(b.id)+'" data-a="del" aria-label="Hapus '+esc(b.id)+'">✕</button>')+'</div>';
   return el;
 }
@@ -501,16 +545,38 @@ async function status(){
 $('#bots').onclick=async e=>{
   const b=e.target.closest('button[data-a]');if(!b)return;
   const id=b.dataset.id,a=b.dataset.a;
+  if(a==='edit')return editBot(id);
+  if(a==='inv')return openInv(id);
   if(a==='del'&&!await ask({title:'Hapus bot '+id+'?',text:'Bot dihentikan dan dihapus dari daftar. Username bisa ditambahkan lagi nanti.',ok:'Hapus bot',danger:1}))return;
   const u=encodeURIComponent(id),d=a==='del'?await call('/api/bots/'+u,null,'DELETE'):await call('/api/bots/'+u+'/'+a,{});
   res(d,{start:'Menyalakan '+id+'…',stop:id+' dihentikan',restart:'Restart '+id+'…',del:id+' dihapus'}[a]);
   setTimeout(status,600);setTimeout(events,1500);
 };
-$('#add').onclick=async()=>{
-  const i=$('#newbot'),d=await call('/api/bots',{username:i.value.trim()});
-  res(d,'Bot ditambahkan, sedang masuk…');if(d.success)i.value='';setTimeout(status,600);
+let editing=null;
+const lines2=v=>v.split('\n').map(x=>x.trim()).filter(Boolean);
+function resetForm(){
+  editing=null;$('#botform').reset();$('#bf-name').disabled=false;
+  $('#bf-title').textContent='Tambah bot';$('#bf-ok').textContent='Tambah bot';$('#bf-cancel').hidden=true;
+}
+async function editBot(id){
+  const c=await call('/api/config'),e=(c.bots||[]).find(x=>x.username===id)||{username:id},sv=e.server||{};
+  editing=id;
+  $('#bf-name').value=id;$('#bf-name').disabled=true;
+  $('#bf-ip').value=sv.ip||'';$('#bf-port').value=sv.port||'';$('#bf-ver').value=sv.version||'';
+  $('#bf-msgs').value=(e.messages||[]).join('\n');$('#bf-delay').value=e.delay||'';
+  $('#bf-title').textContent='Edit '+id;$('#bf-ok').textContent='Simpan perubahan';$('#bf-cancel').hidden=false;
+  $('#botform').scrollIntoView({behavior:'smooth',block:'center'});$('#bf-ip').focus();
+}
+$('#bf-cancel').onclick=resetForm;
+$('#botform').onsubmit=async ev=>{
+  ev.preventDefault();
+  const body={username:$('#bf-name').value.trim(),ip:$('#bf-ip').value.trim(),port:$('#bf-port').value,version:$('#bf-ver').value.trim(),messages:lines2($('#bf-msgs').value),delay:$('#bf-delay').value};
+  const btn=$('#bf-ok');btn.disabled=true;
+  const d=editing?await call('/api/bots/'+encodeURIComponent(editing),body,'PUT'):await call('/api/bots',body);
+  btn.disabled=false;
+  res(d,editing?editing+' diperbarui':'Bot ditambahkan, sedang masuk…');
+  if(d.success)resetForm();setTimeout(status,600);setTimeout(events,1500);
 };
-$('#newbot').onkeydown=e=>{if(e.key==='Enter')$('#add').click()};
 $('#start').onclick=async()=>{res(await call('/api/bots/all/start',{}),'Menyalakan semua bot…');setTimeout(status,800)};
 $('#restart').onclick=async()=>{if(!await ask({title:'Restart semua bot?',text:'Semua bot keluar lalu masuk lagi dalam beberapa detik.',ok:'Restart'}))return;res(await call('/api/bots/all/restart',{}),'Restart semua bot…');setTimeout(status,800)};
 $('#stop').onclick=async()=>{if(!await ask({title:'Hentikan semua bot?',text:'Bot keluar dari server sampai dinyalakan lagi.',ok:'Hentikan',danger:1}))return;res(await call('/api/bots/all/stop',{}),'Semua bot dihentikan');status()};
@@ -523,12 +589,13 @@ function renderPlayers(){
 }
 async function overview(){
   try{OV=await api('/api/overview')}catch(e){return}
-  const s=OV.server||{},y=OV.system||{},el=$('#srvcard');
-  $('#srv').textContent=(CFG&&CFG.server?CFG.server.ip+':'+CFG.server.port:'');
-  el.innerHTML='<div class="srv-h"><span class="dotp '+(s.online?'on':'')+'"></span><h2>Server</h2><span class="mu" style="margin-left:auto">'+(s.online?'Online':'Tidak merespons')+'</span></div>'
+  const y=OV.system||{},el=$('#srvcard'),L=OV.servers&&OV.servers.length?OV.servers:[OV.server||{}];
+  const one=s=>'<div class="srvitem"><div class="srv-h"><span class="dotp '+(s.online?'on':'')+'"></span><b>'+esc(s.ip?s.ip+':'+s.port:'Server')+'</b><span class="mu" style="margin-left:auto">'+(s.online?'Online':'Tidak merespons')+'</span></div>'
+   +(s.bots?'<div class="mu">Bot: '+s.bots.map(esc).join(', ')+'</div>':'')
    +(s.online?(s.motd?'<div class="motd">'+esc(s.motd)+'</div>':'')+'<div class="chips"><span class="chip">'+esc(s.version||'versi ?')+'</span>'+(s.players?'<span class="chip">'+s.players.online+'/'+s.players.max+' pemain</span>':'')+(s.latency!=null?'<span class="chip">'+s.latency+' ms</span>':'')+'</div>'
      +(s.players&&s.players.sample&&s.players.sample.length?'<div class="names">'+s.players.sample.map(n=>'<span class="chip">'+esc(n)+'</span>').join('')+'</div>':'')
-     :'<p class="mu">Server tidak membalas ping ('+esc(s.error||'offline')+'). Di Aternos, server mungkin tidur: nyalakan dulu, bot akan masuk otomatis lewat reconnect.</p>');
+     :'<p class="mu">Server tidak membalas ping ('+esc(s.error||'offline')+'). Di Aternos, server mungkin tidur: nyalakan dulu, bot akan masuk otomatis lewat reconnect.</p>')+'</div>';
+  el.innerHTML='<h2>'+(L.length>1?'Server ('+L.length+')':'Server')+'</h2>'+L.map(one).join('');
   $('#sys').innerHTML='<div>Panel aktif <b>'+fmt(y.uptime)+'</b> · RAM <b>'+y.rssMB+' MB</b> · Node <b>'+esc(y.node)+'</b></div>'
    +'<div>Akses panel: <b>'+(y.protectedPanel?'dilindungi password':'tanpa password')+'</b>'+(y.protectedPanel?'':' <span class="warn">— set env PANEL_PASSWORD jika panel bisa diakses publik.</span>')+'</div>'
    +'<div>Penyimpanan: <b>'+(y.persistent?'permanen (DATA_DIR)':'sementara')+'</b>'+(y.persistent?'':' <span class="warn">— pengaturan bisa hilang saat redeploy. Set env DATA_DIR ke folder Volume.</span>')+'</div>';
@@ -603,6 +670,89 @@ $('#cmd').onkeydown=e=>{
   else if(e.key==='ArrowDown'&&hist.length){e.preventDefault();hi=Math.min(hist.length,hi+1);e.target.value=hist[hi]||''}
 };
 $('#cmds').onclick=e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.fill){$('#cmd').value=b.dataset.c;$('#cmd').focus()}else send(b.dataset.c)};
+
+
+/* ---------- inventory visual ---------- */
+const ICO='https://cdn.jsdelivr.net/gh/PrismarineJS/minecraft-assets@master/data/1.20.2/',icoState={}; // icoState[nama] = 0 (items) | 1 (blocks) | 2 (tidak ada)
+const tint=n=>{let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))>>>0;return 'hsl('+h%360+',42%,38%)'};
+function itemIcon(name){
+  const w=document.createElement('span');w.className='ic';
+  const dirs=['items/','blocks/'];
+  const tile=()=>{w.className='ic tile';w.style.background=tint(name);w.textContent=name.split('_').slice(0,2).map(x=>x[0]).join('').toUpperCase();w.replaceChildren(w.textContent)};
+  if(icoState[name]===2){tile();return w}
+  const img=new Image();img.alt='';img.decoding='async';let i=icoState[name]||0;
+  img.onerror=()=>{i++;if(i<dirs.length){icoState[name]=i;img.src=ICO+dirs[i]+name+'.png'}else{icoState[name]=2;tile()}};
+  img.src=ICO+dirs[i]+name+'.png';w.append(img);return w;
+}
+let inv={id:null,sel:null,sig:'',data:null,timer:null};
+function slotEl(d,s,extra){
+  const b=document.createElement('button');b.type='button';b.className='slot'+(extra||'');b.dataset.s=s;
+  if(!d){b.disabled=true;b.setAttribute('aria-label','Slot kosong');return b}
+  b.setAttribute('aria-label',d.display+' ×'+d.count);b.title=d.display;
+  b.append(itemIcon(d.name));
+  if(d.count>1){const c=document.createElement('span');c.className='cnt';c.textContent=d.count;b.append(c)}
+  if(d.max&&d.used){const f=Math.max(0,1-d.used/d.max),u=document.createElement('span');u.className='dur';u.innerHTML='<i style="width:'+Math.round(f*100)+'%;background:hsl('+Math.round(f*120)+',70%,45%)"></i>';b.append(u)}
+  return b;
+}
+function drawInv(){
+  const d=inv.data,by={};d.slots.forEach(x=>by[x.s]=x);
+  if(inv.sel!=null&&!by[inv.sel])inv.sel=null;
+  const held=36+(d.held||0),root=document.createElement('div');
+  const grid=(from,n,cls)=>{const g=document.createElement('div');g.className='ig';for(let i=0;i<n;i++){const s=from+i;g.append(slotEl(by[s],s,(inv.sel===s?' sel':'')+(s===held&&cls==='hot'?' held':'')))}return g};
+  const eq=document.createElement('div');eq.className='ig';
+  [['Kepala',5],['Dada',6],['Kaki',7],['Sepatu',8]].forEach(([l,s],i)=>{const t=document.createElement('span');t.className='lb';t.textContent=l;t.style.gridColumn=i+1;eq.append(t)});
+  const lk=document.createElement('span');lk.className='lb';lk.textContent='Kiri';lk.style.gridColumn=9;eq.append(lk);
+  [5,6,7,8].forEach((s,i)=>{const e=slotEl(by[s],s,inv.sel===s?' sel':'');e.style.gridColumn=i+1;e.style.gridRow=2;eq.append(e)});
+  const off=slotEl(by[45],45,inv.sel===45?' sel':'');off.style.gridColumn=9;off.style.gridRow=2;eq.append(off);
+  const top=document.createElement('div');top.className='inv-top';top.style.margin='0';
+  top.innerHTML=(d.hp!=null?vbar(d.hp,'hp'):'')+(d.food!=null?vbar(d.food,'food'):'');top.style.flexWrap='wrap';
+  const h=t=>{const e=document.createElement('div');e.className='inv-h';e.textContent=t;return e};
+  root.append(top,h('Armor dan tangan kiri'),eq,h('Tas'),grid(9,27),h('Hotbar (kotak emas = sedang dipegang)'),grid(36,9,'hot'),detail(by[inv.sel]));
+  $('#inv-body').replaceChildren(root);
+}
+function detail(it){
+  const el=document.createElement('div');el.className='det';
+  if(!it){el.innerHTML='<p class="mu" style="margin:0">Ketuk item untuk melihat aksinya.</p>';return el}
+  const h=document.createElement('div');h.className='det-h';h.append(slotEl(it,it.s));
+  const t=document.createElement('div');t.innerHTML='<b>'+esc(it.display)+'</b><div class="mu">'+it.count+' buah'+(it.max?' · durability '+(it.max-it.used)+'/'+it.max:'')+'</div>';h.append(t);el.append(h);
+  const A=[];
+  if([5,6,7,8,45].includes(it.s))A.push(['unwear','Lepas']);
+  else{
+    if(!(it.s>=36&&it.s<=44&&it.s-36===inv.data.held))A.push(['hold','Pegang']);
+    if(it.food)A.push(['eat','Makan','go']);
+    if(it.armor)A.push(['wear','Pakai']);
+    A.push(['offhand','Tangan kiri']);
+    if(it.count>1)A.push(['drop1','Buang 1']);
+    A.push(['dropall','Buang '+(it.count>1?'semua':''),'stop']);
+  }
+  const row=document.createElement('div');row.className='acts';
+  A.forEach(([a,l,c])=>{const b=document.createElement('button');b.type='button';b.className='btn sm '+(c||'');b.dataset.a=a;b.textContent=l.trim();row.append(b)});
+  el.append(row);return el;
+}
+async function refreshInv(force){
+  const d=await call('/api/inventory/'+encodeURIComponent(inv.id));
+  if(!d.success){$('#inv-body').innerHTML='<p class="mu">'+esc(d.msg||'Gagal memuat inventory')+'</p>';inv.sig='';return}
+  const sig=JSON.stringify(d)+'|'+inv.sel;if(sig===inv.sig&&!force)return;
+  inv.sig=sig;inv.data=d;drawInv();
+}
+async function openInv(id){
+  clearInterval(inv.timer);inv={id,sel:null,sig:'',data:null,timer:null};
+  $('#inv-t').textContent='Inventory '+id;$('#inv-body').innerHTML='<p class="mu">Memuat…</p>';
+  $('#invdlg').showModal();await refreshInv(true);
+  inv.timer=setInterval(()=>{if(!$('#dlg').open)refreshInv()},3000);
+}
+$('#invdlg').onclose=()=>clearInterval(inv.timer);
+$('#inv-x').onclick=()=>$('#invdlg').close();
+$('#inv-body').onclick=async e=>{
+  const sl=e.target.closest('.slot[data-s]');
+  if(sl&&!sl.closest('.det')){inv.sel=inv.sel===+sl.dataset.s?null:+sl.dataset.s;inv.sig='';return drawInv()}
+  const b=e.target.closest('.det button[data-a]');if(!b||inv.sel==null)return;
+  const it=inv.data.slots.find(x=>x.s===inv.sel);
+  if(b.dataset.a==='dropall'&&it&&it.count>1&&!await ask({title:'Buang '+it.count+' '+it.display+'?',text:'Semua item di slot ini dijatuhkan ke tanah.',ok:'Buang semua',danger:1}))return;
+  b.disabled=true;
+  const r=await call('/api/inventory/'+encodeURIComponent(inv.id),{action:b.dataset.a,slot:inv.sel});
+  res(r,r.msg);setTimeout(()=>refreshInv(true),500);
+};
 
 /* ---------- live view ---------- */
 let liveTry=0;
