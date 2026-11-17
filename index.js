@@ -27,7 +27,7 @@ const SECRET = "********";
 
 app.use((req, res, next) => {
   const pass = process.env.PANEL_PASSWORD;
-  if (!pass || req.path === "/ping") return next();
+  if (!pass || req.path === "/ping" || req.path.startsWith("/hook/")) return next();
   const [scheme, token] = (req.headers.authorization || "").split(" ");
   const given =
     scheme === "Basic"
@@ -37,10 +37,11 @@ app.use((req, res, next) => {
   res.set("WWW-Authenticate", 'Basic realm="AFK Bot Panel"').status(401).send("Password required");
 });
 
+app.use(express.static(path.join(__dirname, "public"), { index: false })); // manifest, service worker, ikon
 app.get("/", (req, res) => res.sendFile(path.join(__dirname, "public", "index.html")));
 app.get("/api/logs", (req, res) => res.json({ logs: getLogs() }));
 app.get("/api/logs/download", (req, res) =>
-  res.download(path.join(__dirname, "logs", "bot.log"), "bot.log", (err) => { if (err && !res.headersSent) res.status(404).send("Belum ada log"); }));
+  res.download(require("./logger").file, "bot.log", (err) => { if (err && !res.headersSent) res.status(404).send("Belum ada log"); }));
 
 app.get("/api/config", (req, res) => {
   const c = JSON.parse(JSON.stringify(config));
@@ -48,6 +49,7 @@ app.get("/api/config", (req, res) => {
   if (c.utils?.["auto-auth"]?.password) c.utils["auto-auth"].password = SECRET;
   if (c.discord?.webhookUrl) c.discord.webhookUrl = SECRET;
   if (c.telegram?.token) c.telegram.token = SECRET;
+  if (c.api?.token) c.api.token = SECRET;
   res.json(c);
 });
 
@@ -62,6 +64,16 @@ function mergeConfig(target, src) {
   }
 }
 
+// Penyimpanan permanen: set env DATA_DIR ke folder Volume (mis. /data)
+const DATA_DIR = process.env.DATA_DIR;
+const SETTINGS_FILE = path.join(DATA_DIR || __dirname, "settings.json");
+if (DATA_DIR) {
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    if (fs.existsSync(SETTINGS_FILE)) mergeConfig(config, JSON.parse(fs.readFileSync(SETTINGS_FILE, "utf8")));
+  } catch (e) { addLog("[Server] Gagal memuat settings dari DATA_DIR: " + e.message); }
+}
+
 app.post("/api/config", (req, res) => {
   const b = req.body || {};
   const sv = b.server || {};
@@ -71,7 +83,7 @@ app.post("/api/config", (req, res) => {
     return res.status(400).json({ success: false, msg: "Invalid port" });
   try {
     mergeConfig(config, b);
-    fs.writeFileSync(path.join(__dirname, "settings.json"), JSON.stringify(config, null, 2));
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(config, null, 2));
     addLog("[Control] Settings saved - restarting bot");
     manager.build();
     setTimeout(() => manager.startAll(), 3000);
@@ -1130,6 +1142,8 @@ server.on("error", (err) => {
   }
 });
 
+require("./liveproxy")(app, server, config);
+
 // FIX: only one definition of formatUptime
 function formatUptime(seconds) {
   const h = Math.floor(seconds / 3600);
@@ -2047,7 +2061,7 @@ const manager = {
   },
   get(id) { return this.list.find((b) => b.id === id); },
   save() {
-    fs.writeFileSync(path.join(__dirname, "settings.json"), JSON.stringify(config, null, 2));
+    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(config, null, 2));
   },
   stop(b) { clearTimeout(b.timer); b.stop(); },
   // stagger joins so the server does not throttle us
@@ -2078,6 +2092,7 @@ const manager = {
 // CONSOLE COMMANDS (terminal) - applies to every connected bot
 // ============================================================
 require("./extras").telegram(manager, config, addLog);
+require("./more")(app, manager, config, addLog);
 const readline = require("readline");
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: false });
 

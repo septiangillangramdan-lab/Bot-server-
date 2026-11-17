@@ -6,6 +6,14 @@ const { goals, Movements } = require("mineflayer-pathfinder");
 const { GoalNear, GoalFollow, GoalXZ } = goals;
 const logger = require("./logger");
 
+// port internal viewer; kalau sama dengan port panel (env PORT), geser satu angka
+function viewerPort(cfg) {
+  const p = Number(cfg.viewer && cfg.viewer.port) || 3007;
+  return p === (Number(process.env.PORT) || 5000) ? p + 1 : p;
+}
+
+const chat = []; // buffer chat untuk tab Chat
+const ctx = {}; // diisi more.js (manager)
 let tg = null; // { token, chatId } kalau Telegram aktif
 let viewer = null; // { bot } pemilik live view saat ini
 let lastNote = 0;
@@ -124,6 +132,43 @@ function attach(bot, mcData, move, log, addInterval, config, state) {
     })();
   }
 
+  // Buffer chat untuk tab Chat
+  const pushChat = (user, msg, dm) => { chat.push({ t: Date.now(), bot: bot.username, user, msg, dm }); if (chat.length > 100) chat.shift(); };
+  bot.on("chat", (u, m) => pushChat(u, m, false));
+  bot.on("whisper", (u, m) => pushChat(u, m, true));
+
+  // Pemicu dari pesan server: "teks => notify | restart | cmd:/spawn"
+  const trig = Array.isArray(config.triggers) ? config.triggers : [];
+  if (trig.length) {
+    let coolT = 0;
+    bot.on("messagestr", (msg) => {
+      if (Date.now() < coolT) return;
+      const low = msg.toLowerCase(), t = trig.find((x) => x.match && low.includes(String(x.match).toLowerCase()));
+      if (!t) return;
+      coolT = Date.now() + 10000;
+      log(`Pemicu "${t.match}" -> ${t.action}`);
+      if (t.action === "notify") notify(`🔔 ${bot.username}: ${msg.slice(0, 200)}`);
+      else if (t.action === "restart") { const b = ctx.manager && ctx.manager.list.find((x) => x.bot === bot); if (b) { ctx.manager.stop(b); ctx.manager.startLater(b, 3000); } }
+      else if (t.action === "cmd" && t.arg) bot.chat(t.arg);
+    });
+  }
+
+  // Pakai armor terbaik di inventory
+  if (on("armor")) {
+    const tiers = ["leather", "golden", "chainmail", "iron", "diamond", "netherite"], slots = { helmet: "head", chestplate: "torso", leggings: "legs", boots: "feet" };
+    const rank = (i) => tiers.indexOf(i.name.split("_")[0]);
+    addInterval(async () => {
+      if (!up() || !bot.entity) return;
+      for (const [part, dest] of Object.entries(slots)) {
+        const best = bot.inventory.items().filter((i) => i.name.endsWith("_" + part)).sort((a, b) => rank(b) - rank(a))[0];
+        if (!best) continue;
+        const cur = bot.inventory.slots[bot.getEquipmentDestSlot(dest)];
+        if (cur && rank(cur) >= rank(best)) continue;
+        try { await bot.equip(best, dest); } catch (e) {}
+      }
+    }, 30000);
+  }
+
   // Aturan balas chat: "kata kunci => balasan". {bot} dan {player} diganti otomatis, "*" = semua DM
   const rules = Array.isArray(config.rules) ? config.rules : [];
   if (rules.length) {
@@ -151,7 +196,7 @@ function attach(bot, mcData, move, log, addInterval, config, state) {
     }
     if (!viewer) {
       try {
-        const port = Number(v.port) || 3007;
+        const port = viewerPort(config);
         require("prismarine-viewer").mineflayer(bot, { port, firstPerson: true });
         viewer = { bot }; log(`Live view aktif di port ${port}`);
       } catch (e) { log("Live view gagal (jalankan: npm i prismarine-viewer): " + e.message); }
@@ -197,4 +242,4 @@ function telegram(manager, config, log) {
   })();
 }
 
-module.exports = { attach, command, telegram, notify };
+module.exports = { attach, command, telegram, notify, viewerPort, chat, ctx };

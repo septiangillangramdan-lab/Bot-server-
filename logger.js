@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const dir = path.join(__dirname, "logs");
+const dir = path.join(process.env.DATA_DIR || __dirname, "logs");
 const file = path.join(dir, "bot.log");
 const logs = [];
 const listeners = [];
@@ -33,4 +33,4 @@ function onLog(fn) {
   listeners.push(fn);
 }
 
-module.exports = { addLog, getLogs, onLog };
+module.exports = { addLog, getLogs, onLog, file };
