@@ -3,6 +3,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Panel AFK Bot</title>
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('th')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')}catch(e){}</script>
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="#0e1530"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Pixelify+Sans:wght@500;700&display=swap">
 <style>
 :root{color-scheme:light;--bg:#d9edf7;--panel:#f6f8f4;--ink:#2b2118;--mu:#566150;--edge:#2b2118;--field:#fff;--line:#c3cdb9;--stone:#dfe5d8;--hi:#ffffff80;--lo:#0000002e;--grass:#3f8524;--red:#b3321f;--lapis:#2f5fc4;--ok:#3f8524;--wait:#e0a526;--bad:#b3321f;--warn:#8a5d00}
@@ -30,6 +31,9 @@ h2{font-size:18px;margin:0 0 2px}
 .btn:active{box-shadow:0 0 0 2px var(--edge),inset 3px 3px 0 var(--lo),inset -3px -3px 0 var(--hi);transform:translateY(1px)}
 .btn:disabled{opacity:.45;pointer-events:none}
 .go{background:var(--grass);color:#fff}.stop{background:var(--red);color:#fff}
+.btn.on{outline:3px solid var(--ink);outline-offset:-3px}
+#chat b{color:#8fb0ff}#chat .d{color:#ffd34d}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:10px}
 :focus-visible{outline:3px solid var(--lapis);outline-offset:3px}
 section{display:none}section.show{display:block}
 #bots{padding:2px 16px}
@@ -44,8 +48,8 @@ section{display:none}section.show{display:block}
 .info{flex:1;min-width:0}
 .tag{margin-left:8px;padding:0 6px;font-size:11px;color:var(--lapis);box-shadow:0 0 0 1px currentColor}
 .warn{color:var(--warn);font-size:13px}
-#log{height:calc(100dvh - 270px);min-height:260px;overflow:auto;padding:12px;margin-bottom:16px;background:#0b1020;font:12px/1.65 ui-monospace,Menlo,monospace;box-shadow:0 0 0 2px var(--edge),inset 3px 3px 0 #00000080}
-#log div{white-space:pre-wrap;word-break:break-word;color:#a7b2d6}
+#log,#chat{height:calc(100dvh - 270px);min-height:260px;overflow:auto;padding:12px;margin-bottom:16px;background:#0b1020;font:12px/1.65 ui-monospace,Menlo,monospace;box-shadow:0 0 0 2px var(--edge),inset 3px 3px 0 #00000080}
+#log div,#chat div{white-space:pre-wrap;word-break:break-word;color:#a7b2d6}
 #log .t{color:#5d6a94}
 #log .e{color:#ff7b6e}#log .w{color:#ffd34d}#log .s{color:#7bd957}#log .c{color:#8fb0ff}
 input[type=text],input[type=number],input[type=password],select,textarea{width:100%;padding:10px;border:0;background:var(--field);color:var(--ink);font:inherit;box-shadow:0 0 0 2px var(--edge),inset 3px 3px 0 var(--lo)}
@@ -77,10 +81,12 @@ svg.i{width:22px;height:22px;fill:currentColor;shape-rendering:crispEdges}
   <div class="two"><button class="btn go" id="start">Nyalakan semua</button><button class="btn stop" id="stop">Hentikan semua</button></div>
   <div class="panel" id="bots"></div>
   <div class="row"><input type="text" id="newbot" placeholder="Username bot baru" autocapitalize="off" aria-label="Username bot baru"><button class="btn go" id="add">Tambah</button></div>
+  <div class="panel" id="stats" style="margin-top:16px"></div>
 </section>
 
 <section id="t-logs">
-  <div id="log" role="log" aria-live="off"></div>
+  <div class="two" style="margin-bottom:12px"><button class="btn on" id="m-log">Log</button><button class="btn" id="m-chat">Chat</button></div>
+  <div id="log" role="log" aria-live="off"></div><div id="chat" style="display:none"></div>
   <div class="row" style="margin-bottom:12px"><select id="tgt" aria-label="Bot tujuan"><option value="all">Semua bot</option></select></div>
   <div class="row"><input type="text" id="cmd" placeholder="Chat atau /command" autocomplete="off" autocapitalize="off" aria-label="Chat atau perintah"><button class="btn go" id="send">Kirim</button></div>
   <p class="mu">Ketik /help untuk daftar perintah. <a href="/api/logs/download" style="color:var(--lapis)">Unduh log lengkap</a></p>
@@ -89,6 +95,11 @@ svg.i{width:22px;height:22px;fill:currentColor;shape-rendering:crispEdges}
 <section id="t-live">
   <div class="panel"><h2>Live view</h2><p class="mu" id="lv-msg">Memuat…</p></div>
   <iframe id="lv" title="Live view bot" style="display:none;width:100%;height:60vh;border:0;background:#000;box-shadow:0 0 0 2px var(--edge)"></iframe>
+  <div class="panel" id="rc" style="margin-top:16px"><h2>Kontrol bot</h2><p class="mu">Memakai bot yang dipilih di tab Log (default: bot online pertama).</p>
+    <div class="pad"><span></span><button class="btn" data-c="maju" aria-label="Maju">▲</button><span></span>
+      <button class="btn" data-c="kiri" aria-label="Kiri">◀</button><button class="btn" data-c="mundur" aria-label="Mundur">▼</button><button class="btn" data-c="kanan" aria-label="Kanan">▶</button>
+      <button class="btn" data-c="putar-kiri" aria-label="Putar kiri">⟲</button><button class="btn" data-c="lompat">Lompat</button><button class="btn" data-c="putar-kanan" aria-label="Putar kanan">⟳</button>
+      <span></span><button class="btn" data-c="jongkok">Jongkok</button><span></span></div></div>
 </section>
 
 <section id="t-settings">
@@ -136,8 +147,23 @@ svg.i{width:22px;height:22px;fill:currentColor;shape-rendering:crispEdges}
     <label>Token bot (dari @BotFather)</label><input type="password" data-k="telegram.token">
     <label>Chat ID</label><input type="text" data-k="telegram.chatId" inputmode="numeric">
     <label class="sw"><span>Live view bot utama</span><input type="checkbox" data-k="viewer.enabled"></label>
-    <label>Port live view</label><input type="number" data-k="viewer.port" inputmode="numeric">
+    <label>Port internal live view</label><input type="number" data-k="viewer.port" inputmode="numeric">
     <p class="mu">Telegram baru aktif setelah server dijalankan ulang. Live view aktif setelah simpan &amp; restart bot.</p>
+  </div>
+  <div class="panel">
+    <h2>Lainnya</h2>
+    <label class="sw"><span>Pakai armor terbaik otomatis</span><input type="checkbox" data-k="armor.enabled"></label>
+    <label class="sw"><span>Berhenti otomatis jika kena ban / whitelist</span><input type="checkbox" data-k="smart-reconnect.enabled"></label>
+    <label>Pemicu dari pesan server (teks =&gt; notify, restart, atau cmd:/spawn)</label>
+    <textarea id="trig" rows="3" placeholder="afk =&gt; cmd:/spawn"></textarea>
+    <label>Token tombol cepat (untuk /hook/TOKEN/restart)</label><input type="password" data-k="api.token">
+  </div>
+  <div class="panel">
+    <h2>Profil server &amp; cadangan</h2>
+    <label>Profil tersimpan</label><select id="prof"></select>
+    <div class="two" style="margin:12px 0 0"><button class="btn" id="prof-use">Terapkan</button><button class="btn" id="prof-save">Simpan profil</button></div>
+    <div class="two" style="margin:12px 0 0"><button class="btn" id="exp">Ekspor pengaturan</button><button class="btn" id="imp">Impor pengaturan</button></div>
+    <input type="file" id="impf" accept=".json,application/json" hidden>
   </div>
   <button class="btn go" id="save">Simpan &amp; restart bot</button>
 </section>
@@ -184,7 +210,7 @@ $('#theme').onclick=()=>theme(root.dataset.theme==='dark'?'light':'dark');
 $$('nav button').forEach(b=>b.onclick=()=>{
   $$('nav button').forEach(x=>x.classList.toggle('on',x===b));
   $$('section').forEach(s=>s.classList.toggle('show',s.id==='t-'+b.dataset.t));
-  if(b.dataset.t==='logs')logs(true);
+  if(b.dataset.t==='logs')(mode==='chat'?chat:logs)(true);
   if(b.dataset.t==='live')live();
 });
 
@@ -200,7 +226,7 @@ async function status(){
     $('#bots').replaceChildren(...B.map(b=>{
       const s=b.connected?'on':b.running?'wait':'off',el=document.createElement('div');el.className='bot';
       const pos=b.connected&&b.coords?[b.coords.x,b.coords.y,b.coords.z].map(Math.floor).join(', ')+' · '+fmt(b.uptime):b.running?'Mencoba masuk…':'Berhenti';
-      el.innerHTML='<div class="av '+s+'">'+face(b.id)+'<i></i></div><div class="info"><b>'+esc(b.id)+'</b>'+(b.main?'<span class="tag">utama</span>':'')+'<div class="mu">'+pos+(b.hp!=null?' · ❤ '+b.hp+' · 🍗 '+b.food:'')+'</div>'+(b.items&&b.items.length?'<details class="mu" data-id="'+esc(b.id)+'"'+(OP.has(b.id)?' open':'')+'><summary>Inventory ('+b.items.length+')</summary>'+b.items.map(esc).join(', ')+'</details>':'')+(b.issue?'<div class="warn">'+esc(b.issue)+(b.drops>1?' (putus '+b.drops+'x)':'')+'</div>':'')+'</div>'
+      el.innerHTML='<div class="av '+s+'">'+face(b.id)+'<i></i></div><div class="info"><b>'+esc(b.id)+'</b>'+(b.main?'<span class="tag">utama</span>':'')+'<div class="mu">'+pos+(b.hp!=null?' · ❤ '+b.hp+' · 🍗 '+b.food:'')+'</div>'+(b.items&&b.items.length?'<details class="mu" data-id="'+esc(b.id)+'"'+(OP.has(b.id)?' open':'')+'><summary>Inventory ('+b.items.length+')</summary>'+b.items.map(esc).join(', ')+'</details>':'')+(b.near&&b.near.length?'<details class="mu" data-id="n:'+esc(b.id)+'"'+(OP.has('n:'+b.id)?' open':'')+'><summary>Sekitar ('+b.near.length+')</summary>'+b.near.map(n=>esc(n.n)+' '+n.d+'m'+(n.k==='player'?' 👤':'')).join(', ')+'</details>':'')+(b.issue?'<div class="warn">'+esc(b.issue)+(b.drops>1?' (putus '+b.drops+'x)':'')+'</div>':'')+'</div>'
         +'<button class="btn '+(b.running?'stop':'go')+'" data-id="'+esc(b.id)+'" data-a="'+(b.running?'stop':'start')+'">'+(b.running?'Hentikan':'Nyalakan')+'</button>'
         +(b.main?'':'<button class="btn" data-id="'+esc(b.id)+'" data-a="del" aria-label="Hapus '+esc(b.id)+'">✕</button>');
       return el}));
@@ -236,7 +262,7 @@ async function logs(force){
 
 async function send(){
   const i=$('#cmd'),c=i.value.trim();if(!c)return;
-  i.value='';await api('/command',{command:c,bot:$('#tgt').value});logs(true);
+  i.value='';await api('/command',{command:c,bot:$('#tgt').value});setTimeout(()=>(mode==='chat'?chat:logs)(true),600);
 }
 $('#send').onclick=send;
 $('#cmd').onkeydown=e=>{if(e.key==='Enter')send()};
@@ -247,15 +273,16 @@ $('#stop').onclick=async()=>{const d=await api('/api/bots/all/stop',{});toast(d.
 async function live(){
   const c=await api('/api/config'),v=c.viewer||{},f=$('#lv');
   if(!v.enabled){f.style.display='none';$('#lv-msg').textContent='Live view belum aktif. Nyalakan di Pengaturan, simpan, lalu buka lagi.';return}
-  const u=location.protocol+'//'+location.hostname+':'+(v.port||3007);
-  $('#lv-msg').textContent='Tampilan dari bot utama (port '+(v.port||3007)+'). Port itu harus terbuka di hostmu.';
-  if(f.dataset.u!==u){f.dataset.u=u;f.src=u}f.style.display='block';
+  $('#lv-msg').textContent='Tampilan dari bot utama. Ketuk tab Live lagi untuk memuat ulang.';
+  f.src='/live/';f.style.display='block';
 }
 async function load(){
   const c=await api('/api/config');
   $$('[data-k]').forEach(e=>{const v=get(c,e.dataset.k);if(e.type==='checkbox')e.checked=!!v;else e.value=v??''});
   $('#msgs').value=(get(c,'utils.chat-messages.messages')||[]).join('\n');
   $('#rules').value=(c.rules||[]).map(r=>r.match+' => '+r.reply).join('\n');
+  $('#trig').value=(c.triggers||[]).map(t=>t.match+' => '+t.action+(t.arg?':'+t.arg:'')).join('\n');
+  PROF=c.profiles||[];fillProf();
   $('#srv').textContent=c.server.ip+':'+c.server.port;
 }
 $('#save').onclick=async()=>{
@@ -263,12 +290,43 @@ $('#save').onclick=async()=>{
   $$('[data-k]').forEach(e=>put(o,e.dataset.k,e.type==='checkbox'?e.checked:e.type==='number'?Number(e.value):e.value));
   put(o,'utils.chat-messages.messages',$('#msgs').value.split('\n').map(s=>s.trim()).filter(Boolean));
   put(o,'rules',$('#rules').value.split('\n').map(s=>{const i=s.indexOf('=>');return i<0?null:{match:s.slice(0,i).trim(),reply:s.slice(i+2).trim()}}).filter(r=>r&&r.match&&r.reply));
+  put(o,'triggers',$('#trig').value.split('\n').map(s=>{const i=s.indexOf('=>');if(i<0)return null;const r=s.slice(i+2).trim(),j=r.indexOf(':');return{match:s.slice(0,i).trim(),action:(j<0?r:r.slice(0,j)).trim(),arg:j<0?'':r.slice(j+1).trim()}}).filter(t=>t&&t.match&&t.action));
+  put(o,'profiles',PROF);
   const d=await api('/api/config',o);
   toast(d.success?'Tersimpan. Bot restart…':d.msg);
   if(d.success){load();setTimeout(status,4000)}
 };
 
+let mode='log',PROF=[];
+function setMode(m){mode=m;$('#log').style.display=m==='log'?'':'none';$('#chat').style.display=m==='chat'?'':'none';$('#m-log').classList.toggle('on',m==='log');$('#m-chat').classList.toggle('on',m==='chat');(m==='chat'?chat:logs)(true)}
+$('#m-log').onclick=()=>setMode('log');$('#m-chat').onclick=()=>setMode('chat');
+async function chat(force){
+  const box=$('#chat'),near=force||box.scrollHeight-box.scrollTop-box.clientHeight<60;
+  try{
+    const r=await api('/api/chat');
+    box.replaceChildren(...r.chat.map(c=>{const d=document.createElement('div'),b=document.createElement('b');b.textContent=c.user;if(c.dm)d.className='d';d.append(new Date(c.t).toTimeString().slice(0,5)+' ',b,(c.dm?' (DM)':'')+': '+c.msg);return d}));
+    if(near)box.scrollTop=box.scrollHeight;
+  }catch(e){}
+}
+$('#rc').onclick=async e=>{const b=e.target.closest('button');if(!b)return;const t=$('#tgt').value,d=await api('/api/control',{bot:t==='all'?'':t,action:b.dataset.c});if(!d.success)toast(d.msg)};
+async function stats(){
+  try{
+    const s=await api('/api/stats'),ks=Object.keys(s).sort().slice(-7),el=$('#stats');
+    if(!ks.length){el.innerHTML='<h2>Statistik</h2><p class="mu">Belum ada data. Tunggu beberapa menit.</p>';return}
+    const R={};let dr=0;ks.forEach(k=>{dr+=s[k].drops;for(const r in s[k].reasons)R[r]=(R[r]||0)+s[k].reasons[r]});
+    const top=Object.entries(R).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    el.innerHTML='<h2>Statistik 7 hari</h2><p class="mu">Tinggi batang = persen waktu terhubung per hari.</p><div style="display:flex;gap:6px;align-items:flex-end;height:80px;margin:10px 0">'+ks.map(k=>{const p=s[k].run?Math.round(s[k].up/s[k].run*100):0;return '<div title="'+k+': '+p+'%" style="flex:1;text-align:center"><div style="height:'+Math.max(p*.6,2)+'px;background:var(--ok);box-shadow:0 0 0 2px var(--edge)"></div><span class="mu">'+k.slice(8)+'</span></div>'}).join('')+'</div><div class="mu">Putus: '+dr+'x'+(top.length?' · Sebab terbanyak: '+top.map(t=>esc(t[0])+' ('+t[1]+'x)').join(', '):'')+'</div>';
+  }catch(e){}
+}
+function fillProf(){$('#prof').innerHTML=PROF.map((p,i)=>'<option value="'+i+'">'+esc(p.name)+'</option>').join('')||'<option value="">(belum ada)</option>'}
+$('#prof-save').onclick=()=>{const n=prompt('Nama profil?');if(!n)return;const g=k=>$('[data-k="'+k+'"]').value;PROF=PROF.filter(p=>p.name!==n).concat({name:n,ip:g('server.ip'),port:Number(g('server.port')),version:g('server.version')});fillProf();toast('Profil disimpan. Tekan Simpan & restart bot.')};
+$('#prof-use').onclick=()=>{const p=PROF[$('#prof').value];if(!p)return;const s=(k,v)=>$('[data-k="'+k+'"]').value=v;s('server.ip',p.ip);s('server.port',p.port);s('server.version',p.version);toast('Diterapkan. Tekan Simpan & restart bot.')};
+$('#exp').onclick=async()=>{const c=await api('/api/config'),a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(c,null,2)],{type:'application/json'}));a.download='afk-bot-settings.json';a.click()};
+$('#imp').onclick=()=>$('#impf').click();
+$('#impf').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const d=await api('/api/config',JSON.parse(await f.text()));toast(d.success?'Diimpor. Bot restart…':d.msg);if(d.success)load()}catch(x){toast('File tidak valid')}e.target.value=''};
+if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
+stats();setInterval(stats,60000);
 load();status();
 setInterval(status,4000);
-setInterval(()=>{if($('#t-logs').classList.contains('show'))logs()},3000);
+setInterval(()=>{if($('#t-logs').classList.contains('show'))(mode==='chat'?chat:logs)()},3000);
 </script></body></html>
