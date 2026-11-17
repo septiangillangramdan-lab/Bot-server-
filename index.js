@@ -1075,6 +1075,7 @@ app.post("/api/bots/:id/:action", (req, res) => {
   if (!t.length) return res.status(404).json({ success: false, msg: "Bot tidak ditemukan" });
   if (req.params.action === "start") t.forEach((b, i) => !b.running && manager.startLater(b, i * 6000));
   else if (req.params.action === "stop") t.forEach((b) => manager.stop(b));
+  else if (req.params.action === "restart") t.forEach((b, i) => { manager.stop(b); manager.startLater(b, 1500 + i * 6000); });
   else return res.status(400).json({ success: false, msg: "Aksi tidak dikenal" });
   addLog(`[Control] ${req.params.action} ${req.params.id}`);
   res.json({ success: true });
