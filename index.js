@@ -53,6 +53,50 @@ app.get("/api/config", (req, res) => {
   res.json(c);
 });
 
+// Ubah alasan kick (JSON chat, komponen chat, atau NBT 1.20.3+) menjadi teks biasa
+function simplifyNbt(n) {
+  if (n && typeof n === "object" && typeof n.type === "string" && "value" in n) {
+    if (n.type === "compound") {
+      const o = {};
+      for (const k of Object.keys(n.value || {})) o[k] = simplifyNbt(n.value[k]);
+      return o;
+    }
+    if (n.type === "list") {
+      const v = n.value && n.value.value !== undefined ? n.value.value : [];
+      return (Array.isArray(v) ? v : [v]).map((x) => simplifyNbt(n.value && n.value.type === "compound" ? { type: "compound", value: x } : x));
+    }
+    return n.value;
+  }
+  return n;
+}
+function flattenChat(c, depth) {
+  depth = depth || 0;
+  if (c == null || depth > 12) return "";
+  if (typeof c === "string") return c;
+  if (typeof c === "number" || typeof c === "boolean") return String(c);
+  if (Array.isArray(c)) return c.map((x) => flattenChat(x, depth + 1)).join("");
+  let out = "";
+  if (c.text != null) out += flattenChat(c.text, depth + 1);
+  else if (c.translate) {
+    const args = Array.isArray(c.with) ? c.with.map((x) => flattenChat(x, depth + 1)) : [];
+    out += args.length ? args.join(" ") : String(c.translate);
+  }
+  if (c.extra) out += flattenChat(c.extra, depth + 1);
+  return out;
+}
+function readableReason(reason) {
+  try {
+    let r = reason;
+    if (typeof r === "string") {
+      const t = r.trim();
+      if (t[0] === "{" || t[0] === "[") { try { r = JSON.parse(t); } catch (e) { return t.replace(/§./g, "").trim(); } }
+      else return t.replace(/§./g, "").trim();
+    }
+    const txt = flattenChat(simplifyNbt(r)).replace(/§./g, "").replace(/\s+/g, " ").trim();
+    return txt || JSON.stringify(reason);
+  } catch (e) { return String(reason); }
+}
+
 function mergeConfig(target, src) {
   for (const k of Object.keys(src)) {
     if (k === "__proto__" || k === "constructor" || k === "prototype") continue;
@@ -1450,8 +1494,7 @@ function makeBot(id, account, baseConfig) {
       // so that 'end' is the single source of reconnect truth, preventing double-trigger.
       bot.on("kicked", (reason) => {
         // FIX: stringify reason if it's an object to make it readable in logs
-        const kickReason =
-          typeof reason === "object" ? JSON.stringify(reason) : reason;
+        const kickReason = readableReason(reason);
         addLog(`[Bot] Kicked: ${kickReason}`);
       botState.lastIssue = "Kicked: " + String(kickReason).slice(0, 110);
       if (/another location|already (online|logged|connected)|duplicate_login|same name/i.test(String(kickReason))) {
@@ -1557,51 +1600,73 @@ function makeBot(id, account, baseConfig) {
   function initializeModules(bot, mcData, defaultMove) {
     addLog("[Modules] Initializing all modules...");
 
-    // ---------- AUTO AUTH (REACTIVE) ----------
+    // ---------- AUTO AUTH (REAKTIF) ----------
+    // Akun baru -> /register <pw> <pw>; akun lama -> /login <pw>. Dibaca dari balasan server,
+    // jadi urutannya otomatis benar walau tebakan pertama salah.
     if (config.utils["auto-auth"] && config.utils["auto-auth"].enabled) {
-      const password = config.utils["auto-auth"].password;
-      let authHandled = false;
-
-      const tryAuth = (type) => {
-        if (authHandled || !bot || !botState.connected) return;
-        authHandled = true;
-        if (type === "register") {
-          bot.chat(`/register ${password} ${password}`);
-          addLog("[Auth] Detected register prompt - sent /register");
-        } else {
-          bot.chat(`/login ${password}`);
-          addLog("[Auth] Detected login prompt - sent /login");
-        }
+      const password = String(config.utils["auto-auth"].password || "");
+      const st = { done: false, last: 0, sent: { login: 0, register: 0 }, at: Date.now() };
+      const RE = {
+        regPrompt: /\/reg(?:ister)?\b/i,
+        logPrompt: /\/l(?:ogin)?\b/i,
+        needReg: /(not|n't)\s+(yet\s+)?registered|register\s+first|must\s+register|please\s+register|unregistered|belum\s+(terdaftar|register|daftar)|daftar\s+dulu/i,
+        hasAcc: /already\s+(registered|have\s+an?\s+account|exists?)|account\s+(already\s+)?exists?|sudah\s+(terdaftar|register|daftar)/i,
+        bad: /not\s+(yet\s+)?(logged|authenticated)|belum\s+login|wrong\s+password|incorrect\s+password|salah/i,
+        ok: /successful(ly)?\s+(logged|login|registered|authenticated)|(logged|log)\s*in\s+successful|you\s+are\s+(now\s+)?logged\s+in|already\s+logged\s+in|login\s+success|authenticated|berhasil\s+(login|masuk|daftar|register)|welcome\s+back|registered\s+successfully|register\s+success/i,
+      };
+      const regCmd = (msg) => {
+        const m = msg.match(/\/reg(?:ister)?((?:\s+[<\[][^>\]]*[>\]])*)/i);
+        const n = m ? (m[1].match(/[<\[]/g) || []).length : 2;
+        return n === 1 ? `/register ${password}` : `/register ${password} ${password}`;
+      };
+      const send = (type, msg) => {
+        if (st.done || !bot || !botState.connected) return;
+        if (!password) { if (!st.warned) { st.warned = true; addLog("[Auth] Password kosong, isi dulu di Pengaturan"); } return; }
+        const now = Date.now();
+        if (now - st.last < 2500 || st.sent[type] >= 3) return;
+        st.last = now; st.sent[type]++;
+        if (!st.viaFailsafe) st.prompted = true;
+        const cmd = type === "register" ? regCmd(msg || "") : `/login ${password}`;
+        setTimeout(() => {
+          if (st.done || !bot || !botState.connected) return;
+          try { bot.chat(cmd); } catch (e) {}
+          addLog(`[Auth] Mengirim /${type}${st.sent[type] > 1 ? ` (percobaan ${st.sent[type]})` : ""}`);
+        }, 700);
       };
 
-      bot.on("messagestr", (message) => {
-        if (authHandled) return;
-        const msg = message.toLowerCase();
-        if (
-          msg.includes("/register") ||
-          msg.includes("register ") ||
-          msg.includes("지정된 비밀번호")
-        ) {
-          tryAuth("register");
-        } else if (
-          msg.includes("/login") ||
-          msg.includes("login ") ||
-          msg.includes("로그인")
-        ) {
-          tryAuth("login");
+      bot.on("messagestr", (message, position, json) => {
+        if (st.done) return;
+        if (json && json.translate === "chat.type.text") return; // chat pemain biasa
+        const msg = String(message || "");
+        if (RE.bad.test(msg) && !RE.needReg.test(msg)) { if (/wrong|incorrect|salah/i.test(msg)) st.wrong = true; return; }
+        if (RE.needReg.test(msg)) return send("register", msg);
+        if (RE.hasAcc.test(msg)) return send("login", msg);
+        if (RE.ok.test(msg) && !RE.bad.test(msg)) {
+          st.done = true;
+          addLog("[Auth] Berhasil masuk / terdaftar");
+          return;
         }
+        const early = Date.now() - st.at < 25000 && !/[»:]\s/.test(msg) && !/^</.test(msg);
+        if (RE.regPrompt.test(msg) && !RE.logPrompt.test(msg)) return send("register", msg);
+        if (RE.logPrompt.test(msg)) return send("login", msg);
+        if (early && /register|daftar|등록|가입/i.test(msg) && /password|pass|kata\s*sandi|비밀번호/i.test(msg)) return send("register", msg);
+        if (early && /login|log in|masuk|로그인/i.test(msg) && /password|pass|kata\s*sandi|비밀번호/i.test(msg)) return send("login", msg);
       });
 
-      // Failsafe: if no prompt after 10s, try login anyway
+      // Cadangan bila server tidak mengirim petunjuk lewat chat:
+      // 10 dtk -> coba /login, 18 dtk -> coba /register (akun baru). Perintah yang tidak perlu tidak berbahaya.
       setTimeout(() => {
-        if (!authHandled && bot && botState.connected) {
-          addLog(
-            "[Auth] No prompt detected after 10s, sending /login as failsafe",
-          );
-          bot.chat(`/login ${password}`);
-          authHandled = true;
-        }
+        if (st.done || st.sent.login || st.sent.register) return;
+        addLog("[Auth] Tidak ada petunjuk dari server, mencoba /login");
+        st.viaFailsafe = true; send("login", ""); st.viaFailsafe = false;
       }, 10000);
+      setTimeout(() => {
+        if (st.done || st.sent.register || st.prompted || st.wrong) return;
+        addLog("[Auth] Belum ada tanda berhasil, mencoba /register");
+        st.last = 0; st.viaFailsafe = true;
+        send("register", "");
+        st.viaFailsafe = false;
+      }, 18000);
     }
 
     // ---------- CHAT MESSAGES ----------
