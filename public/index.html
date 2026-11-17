@@ -132,9 +132,8 @@ svg.i{width:22px;height:22px;fill:currentColor;shape-rendering:crispEdges}
   </div>
   <div class="panel">
     <h2>Otomatisasi</h2>
-    <label class="sw"><span>Mode aman: keluar jika HP rendah</span><input type="checkbox" data-k="safe.enabled"></label>
+    <label class="sw"><span>Mode aman (bot tidak pernah keluar dari server)</span><input type="checkbox" data-k="safe.enabled"></label>
     <label class="sw"><span>Mode aman: kabur dari pemain asing</span><input type="checkbox" data-k="safe.flee-strangers"></label>
-    <label>HP minimum (1–20)</label><input type="number" data-k="safe.min-health" inputmode="numeric">
     <label class="sw"><span>Tidur otomatis saat malam (butuh kasur)</span><input type="checkbox" data-k="sleep.enabled"></label>
     <label class="sw"><span>Memancing (butuh pancing &amp; air, matikan jalan memutar)</span><input type="checkbox" data-k="fishing.enabled"></label>
     <label>Aturan balas chat (kata kunci =&gt; balasan, satu per baris)</label>
@@ -270,11 +269,19 @@ $('#cmd').onkeydown=e=>{if(e.key==='Enter')send()};
 $('#start').onclick=async()=>{const d=await api('/api/bots/all/start',{});toast(d.success?'Menyalakan semua bot…':d.msg);setTimeout(status,800)};
 $('#stop').onclick=async()=>{const d=await api('/api/bots/all/stop',{});toast(d.success?'Semua bot dihentikan':d.msg);status()};
 
+let liveTry=0;
 async function live(){
-  const c=await api('/api/config'),v=c.viewer||{},f=$('#lv');
+  const my=++liveTry,c=await api('/api/config'),v=c.viewer||{},f=$('#lv');
   if(!v.enabled){f.style.display='none';$('#lv-msg').textContent='Live view belum aktif. Nyalakan di Pengaturan, simpan, lalu buka lagi.';return}
-  $('#lv-msg').textContent='Tampilan dari bot utama. Ketuk tab Live lagi untuk memuat ulang.';
-  f.src='/live/';f.style.display='block';
+  f.style.display='none';
+  for(let i=0;i<40&&my===liveTry;i++){
+    $('#lv-msg').textContent=i?'Menunggu bot utama masuk server… (otomatis mencoba lagi)':'Menghubungkan ke Live view…';
+    try{const r=await fetch('/live/',{cache:'no-store'});if(r.status!==502&&r.status!==503){
+      $('#lv-msg').textContent='Tampilan dari bot utama. Ketuk tab Live lagi untuk memuat ulang.';
+      f.src='/live/?t='+Date.now();f.style.display='block';return}}catch(e){}
+    await new Promise(r=>setTimeout(r,3000));
+  }
+  if(my===liveTry)$('#lv-msg').textContent='Live view belum siap. Pastikan bot utama sudah masuk server, lalu ketuk tab Live lagi.';
 }
 async function load(){
   const c=await api('/api/config');
