@@ -240,4 +240,7 @@ module.exports = function more(app, manager, config, addLog) {
     if (act === "status") return res.send(L.map((b) => `${b.id}: ${b.botState.connected ? "online" : b.running ? "menunggu" : "berhenti"}`).join("\n"));
     res.status(404).send("Aksi: restart | start | stop | status");
   });
+
+  // ---------- patroli area (pemain & blok di dalam kotak koordinat) ----------
+  try { require("./patrol").routes(app, manager, config, addLog); } catch (e) { addLog("[Patroli] rute gagal: " + e.message); }
 };

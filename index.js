@@ -1715,6 +1715,7 @@ function makeBot(id, account, baseConfig) {
             )
               return;
             try {
+              if (botState.patrolActive) return;
               const yaw = Math.random() * Math.PI * 2;
               bot.look(yaw, 0, true);
               bot.setControlState("forward", true);
@@ -1785,8 +1786,9 @@ function makeBot(id, account, baseConfig) {
     if (config.modules.chat) {
       chatModule(bot);
     }
-    if (config.modules.survival) require("./survival")(bot, mcData, defaultMove, addLog, addInterval);
+    if (config.modules.survival) require("./survival")(bot, mcData, defaultMove, addLog, addInterval, botState);
     try { require("./extras").attach(bot, mcData, defaultMove, addLog, addInterval, config, botState); } catch (e) { addLog("[Extras] " + e.message); }
+    try { require("./patrol").attach(bot, addLog, addInterval, botState); } catch (e) { addLog("[Patroli] " + e.message); }
 
     addLog("[Modules] All modules initialized!");
   }
@@ -1801,6 +1803,7 @@ function makeBot(id, account, baseConfig) {
 
     addInterval(() => {
       if (!bot || !botState.connected) return;
+      if (botState.patrolActive) return;
       const now = Date.now();
       if (now - lastPathTime < 2000) return;
       lastPathTime = now;
@@ -1831,6 +1834,7 @@ function makeBot(id, account, baseConfig) {
         typeof bot.setControlState !== "function"
       )
         return;
+      if (botState.patrolActive) return;
       try {
         bot.setControlState("jump", true);
         setTimeout(() => {
@@ -1873,6 +1877,7 @@ function makeBot(id, account, baseConfig) {
         typeof bot.setControlState !== "function"
       )
         return;
+      if (botState.patrolActive) return;
       try {
         const entities = Object.values(bot.entities).filter(
           (e) =>

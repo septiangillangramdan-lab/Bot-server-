@@ -8,7 +8,7 @@ const HOSTILE = new Set(["zombie", "husk", "drowned", "skeleton", "stray", "spid
 const ANIMALS = new Set(["cow", "pig", "sheep", "chicken", "rabbit"]);
 const TIERS = ["wooden", "golden", "stone", "iron", "diamond", "netherite"];
 
-module.exports = function survival(bot, mcData, move, log, addInterval) {
+module.exports = function survival(bot, mcData, move, log, addInterval, botState) {
   move.canDig = true;
   bot.pathfinder.setMovements(move);
   const Vec3 = bot.entity.position.constructor;
@@ -126,6 +126,6 @@ module.exports = function survival(bot, mcData, move, log, addInterval) {
   }
 
   addInterval(guard, 500);
-  addInterval(work, 1000);
+  addInterval(() => { if (botState && botState.patrolActive) return; work(); }, 1000); // patroli mengambil alih gerakan
   log("[Survival] Mode survival aktif");
 };
