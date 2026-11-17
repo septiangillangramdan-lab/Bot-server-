@@ -93,7 +93,7 @@ function setupLeaveRejoin(bot, createBot) {
             logThrottled('[AFK] Leaving server (timer)')
             cleanup()
             try {
-                bot.quit()
+                // dinonaktifkan: bot tidak boleh keluar sendiri
             } catch (e) {
                 // ignore if already closed
             }

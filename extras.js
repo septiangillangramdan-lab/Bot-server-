@@ -70,17 +70,13 @@ function attach(bot, mcData, move, log, addInterval, config, state) {
   const on = (k) => config[k] && config[k].enabled;
   const up = () => state.connected && bot._client && !bot._client.ended;
 
-  // Mode aman: keluar saat HP rendah, kabur dari pemain asing
+  // Mode aman: bot TIDAK PERNAH keluar dari server (tidak ada bot.quit karena HP rendah).
+  // Hanya kabur dari pemain asing (opsional) dan makan kalau HP/lapar turun.
   if (on("safe")) {
     const s = config.safe, wl = (s.whitelist || []).map((x) => String(x).toLowerCase());
     let cool = 0;
     addInterval(() => {
       if (!up() || !bot.entity) return;
-      if (bot.health != null && bot.health < (s["min-health"] || 8)) {
-        const m = `Safe mode: HP ${Math.round(bot.health)}, keluar dari server`;
-        log(m); state.lastIssue = m; notify(`⚠️ ${bot.username}: ${m}`);
-        return bot.quit("safe mode");
-      }
       if (s["flee-strangers"] && Date.now() > cool) {
         const o = Object.values(bot.players).find((p) => p.entity && p.username !== bot.username &&
           !wl.includes(p.username.toLowerCase()) && bot.entity.position.distanceTo(p.entity.position) < (s.radius || 16));
@@ -92,6 +88,16 @@ function attach(bot, mcData, move, log, addInterval, config, state) {
         bot.pathfinder.setMovements(move); bot.pathfinder.setGoal(new GoalXZ(t.x, t.z));
       }
     }, 1000);
+  }
+
+  // Pengaman global: apa pun yang memanggil bot.quit() dari dalam bot (kecuali tombol Hentikan di panel) diabaikan
+  if (!bot.__noQuit) {
+    bot.__noQuit = true;
+    const realQuit = bot.quit.bind(bot);
+    bot.quit = (reason) => {
+      if (bot.__allowQuit) return realQuit(reason);
+      log("[Anti-keluar] Permintaan keluar diabaikan" + (reason ? ` (${reason})` : ""));
+    };
   }
 
   // Tidur otomatis saat malam
