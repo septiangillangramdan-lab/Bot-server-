@@ -1043,18 +1043,56 @@ app.get("/logs", (req, res) => {
   `);
 });
 
+// Data bot tambahan: username + (opsional) server sendiri + pesan otomatis sendiri
+function cleanBot(b) {
+  const o = { username: String(b.username || "").trim() };
+  const ip = String(b.ip || "").trim();
+  if (ip) {
+    if (!/^[A-Za-z0-9._:-]{1,253}$/.test(ip)) throw new Error("IP / hostname tidak valid");
+    const port = b.port === "" || b.port == null ? 25565 : Number(b.port);
+    if (!(port > 0 && port < 65536)) throw new Error("Port tidak valid (1-65535)");
+    o.server = { ip, port };
+    const v = String(b.version || "").trim();
+    if (v) o.server.version = v;
+  }
+  const msgs = (Array.isArray(b.messages) ? b.messages : []).map((m) => String(m).trim()).filter(Boolean).slice(0, 30);
+  if (msgs.length) o.messages = msgs;
+  const d = Number(b.delay);
+  if (msgs.length && d > 0) o.delay = Math.max(5, Math.floor(d));
+  return o;
+}
+
 app.post("/api/bots", (req, res) => {
-  const name = String((req.body || {}).username || "").trim();
+  let entry;
+  try { entry = cleanBot(req.body || {}); } catch (e) { return res.status(400).json({ success: false, msg: e.message }); }
+  const name = entry.username;
   if (!/^[A-Za-z0-9_]{3,16}$/.test(name))
     return res.status(400).json({ success: false, msg: "Username: 3-16 huruf/angka/_" });
   if (manager.get(name))
     return res.status(400).json({ success: false, msg: "Username sudah dipakai" });
-  config.bots = (config.bots || []).concat({ username: name });
+  config.bots = (config.bots || []).concat(entry);
   manager.save();
-  const b = makeBot(name, { username: name }, config);
+  const b = makeBot(name, entry, config);
   manager.list.push(b);
   manager.startLater(b, 0);
-  addLog(`[Control] Added bot ${name}`);
+  addLog(`[Control] Added bot ${name}${entry.server ? " -> " + entry.server.ip + ":" + entry.server.port : ""}`);
+  res.json({ success: true });
+});
+
+// Ubah server / pesan bot tambahan; bot dimulai ulang bila sedang berjalan
+app.put("/api/bots/:id", (req, res) => {
+  const i = manager.list.findIndex((b) => b.id === req.params.id);
+  if (i < 1) return res.status(400).json({ success: false, msg: i === 0 ? "Bot utama diubah lewat tab Pengaturan" : "Bot tidak ditemukan" });
+  let entry;
+  try { entry = cleanBot(Object.assign({}, req.body, { username: req.params.id })); } catch (e) { return res.status(400).json({ success: false, msg: e.message }); }
+  config.bots = (config.bots || []).map((b) => (b.username === entry.username ? entry : b));
+  manager.save();
+  const old = manager.list[i], was = old.running;
+  manager.stop(old);
+  const nb = makeBot(entry.username, entry, config);
+  manager.list[i] = nb;
+  if (was) manager.startLater(nb, 1500);
+  addLog(`[Control] Updated bot ${entry.username}`);
   res.json({ success: true });
 });
 
@@ -1215,6 +1253,15 @@ function makeBot(id, account, baseConfig) {
     config.position = Object.assign({}, baseConfig.position, { enabled: false });
     config.modules = Object.assign({}, baseConfig.modules, { avoidMobs: false, combat: false });
     config.utils = Object.assign({}, baseConfig.utils, { "anti-afk": { enabled: false } });
+  }
+  // server & pesan khusus per bot (dari config.bots): kosong = ikut pengaturan utama
+  if (account.server && account.server.ip) {
+    config.server = Object.assign({}, baseConfig.server, account.server, { version: account.server.version || "" });
+  }
+  if (Array.isArray(account.messages) && account.messages.length) {
+    const cm = Object.assign({}, config.utils["chat-messages"], { enabled: true, repeat: true, messages: account.messages });
+    if (account.delay > 0) cm["repeat-delay"] = account.delay;
+    config.utils = Object.assign({}, config.utils, { "chat-messages": cm });
   }
   let botRunning = false;
   const botState = {
@@ -2043,6 +2090,7 @@ function makeBot(id, account, baseConfig) {
     name,
     botState,
     get bot() { return bot; },
+    get srv() { return config.server; },
     get running() { return botRunning; },
     start: startBot,
     stop: stopBot,
@@ -2057,7 +2105,7 @@ const manager = {
   list: [],
   build() {
     this.list.forEach((b) => this.stop(b));
-    const extra = (config.bots || []).map((b) => ({ username: b.username }));
+    const extra = (config.bots || []).map((b) => Object.assign({}, b));
     this.list = [config["bot-account"], ...extra].map((a) => makeBot(a.username, a, config));
   },
   get(id) { return this.list.find((b) => b.id === id); },
@@ -2075,6 +2123,8 @@ const manager = {
     return this.list.map((b, i) => ({
       id: b.id,
       main: i === 0,
+      server: b.srv.ip + ":" + b.srv.port,
+      msgs: i === 0 ? null : ((config.bots || []).find((x) => x.username === b.id) || {}).messages?.length || 0,
       running: b.running,
       connected: b.botState.connected,
       coords: b.bot && b.bot.entity ? b.bot.entity.position : null,

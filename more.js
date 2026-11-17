@@ -98,15 +98,16 @@ module.exports = function more(app, manager, config, addLog) {
   app.get("/api/events", (req, res) => res.json({ events: events.slice().reverse() }));
 
   // ---------- ping server Minecraft (dipakai kartu "Server") + info sistem ----------
-  let pingCache = { t: 0, key: "", data: null };
+  const pingCache = {};
   const flat = (d) => {
     if (d == null) return "";
     if (typeof d === "string") return d;
     return (d.text || "") + (Array.isArray(d.extra) ? d.extra.map(flat).join("") : "");
   };
-  async function pingServer() {
-    const host = config.server.ip, port = Number(config.server.port) || 25565, key = host + ":" + port;
-    if (pingCache.key === key && Date.now() - pingCache.t < 20000) return pingCache.data;
+  async function pingServer(host, port) {
+    port = Number(port) || 25565;
+    const key = host + ":" + port, c = pingCache[key];
+    if (c && Date.now() - c.t < 20000) return c.data;
     let data;
     try {
       const mc = require("minecraft-protocol");
@@ -123,13 +124,18 @@ module.exports = function more(app, manager, config, addLog) {
         motd: flat(r.description).replace(/§./g, "").replace(/\s+/g, " ").trim().slice(0, 120),
       };
     } catch (e) { data = { online: false, error: String(e.message || e).slice(0, 80) }; }
-    pingCache = { t: Date.now(), key, data };
+    pingCache[key] = { t: Date.now(), data };
     return data;
   }
   app.get("/api/overview", async (req, res) => {
     const m = process.memoryUsage();
+    // satu entri per server berbeda (bot bisa berada di server berbeda-beda)
+    const groups = {};
+    manager.list.forEach((b) => { const k = b.srv.ip + ":" + (Number(b.srv.port) || 25565); (groups[k] = groups[k] || { ip: b.srv.ip, port: Number(b.srv.port) || 25565, bots: [] }).bots.push(b.id); });
+    const servers = await Promise.all(Object.values(groups).slice(0, 6).map(async (g) => ({ ...g, ...(await pingServer(g.ip, g.port)) })));
     res.json({
-      server: await pingServer(),
+      servers,
+      server: servers[0] || (await pingServer(config.server.ip, config.server.port)),
       system: {
         uptime: Math.floor(process.uptime()),
         heapMB: Math.round(m.heapUsed / 1048576),
@@ -139,6 +145,69 @@ module.exports = function more(app, manager, config, addLog) {
         persistent: !!process.env.DATA_DIR,
       },
     });
+  });
+
+  // ---------- inventory visual: baca slot + aksi (pegang, makan, pakai armor, buang) ----------
+  // slot jendela inventory: 5-8 armor (kepala, dada, kaki, sepatu), 9-35 tas, 36-44 hotbar, 45 tangan kiri
+  const ARMOR = { helmet: "head", chestplate: "torso", leggings: "legs", boots: "feet", elytra: "torso" };
+  const armorDest = (name) => { const k = Object.keys(ARMOR).find((x) => name.endsWith(x)); return k ? ARMOR[k] : null; };
+  const liveBot = (id) => { const b = manager.list.find((x) => x.id === id); return b && b.botState.connected && b.bot && b.bot.inventory ? b.bot : null; };
+  const within = (p, ms = 6000) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error("timeout")), ms))]);
+  const snap = (bot) => {
+    const out = [];
+    for (let i = 0; i <= 45; i++) {
+      const it = bot.inventory.slots[i];
+      if (!it) continue;
+      let max = 0, used = 0;
+      try { max = it.maxDurability || 0; used = max ? it.durabilityUsed || 0 : 0; } catch (e) {}
+      out.push({ s: i, name: it.name, display: it.displayName || it.name, count: it.count, food: !!it.foodPoints, armor: !!armorDest(it.name), max, used });
+    }
+    return { slots: out, held: bot.quickBarSlot, hp: bot.health != null ? Math.round(bot.health) : null, food: bot.food != null ? bot.food : null };
+  };
+  app.get("/api/inventory/:id", (req, res) => {
+    const bot = liveBot(req.params.id);
+    if (!bot) return res.json({ success: false, msg: "Bot belum terhubung" });
+    res.json({ success: true, ...snap(bot) });
+  });
+  app.post("/api/inventory/:id", async (req, res) => {
+    const bot = liveBot(req.params.id);
+    if (!bot) return res.json({ success: false, msg: "Bot belum terhubung" });
+    const { action } = req.body || {}, slot = Number((req.body || {}).slot);
+    if (!Number.isInteger(slot) || slot < 0 || slot > 45) return res.json({ success: false, msg: "Slot tidak valid" });
+    const it = bot.inventory.slots[slot];
+    if (!it) return res.json({ success: false, msg: "Slot sudah kosong" });
+    const label = it.displayName || it.name;
+    try {
+      if (action === "hold") {
+        if (slot >= 36 && slot <= 44) bot.setQuickBarSlot(slot - 36);
+        else await within(bot.equip(it, "hand"));
+        return res.json({ success: true, msg: label + " dipegang" });
+      }
+      if (action === "offhand") { await within(bot.equip(it, "off-hand")); return res.json({ success: true, msg: label + " di tangan kiri" }); }
+      if (action === "wear") {
+        const d = armorDest(it.name);
+        if (!d) return res.json({ success: false, msg: label + " bukan armor" });
+        await within(bot.equip(it, d)); return res.json({ success: true, msg: label + " dipakai" });
+      }
+      if (action === "unwear") {
+        const d = { 5: "head", 6: "torso", 7: "legs", 8: "feet", 45: "off-hand" }[slot];
+        if (!d) return res.json({ success: false, msg: "Bukan slot armor" });
+        await within(bot.unequip(d)); return res.json({ success: true, msg: label + " dilepas" });
+      }
+      if (action === "eat") {
+        if (!it.foodPoints) return res.json({ success: false, msg: label + " tidak bisa dimakan" });
+        await within(bot.equip(it, "hand"));
+        bot.consume().catch(() => {}); // makan butuh ~1,6 detik, tidak perlu ditunggu
+        return res.json({ success: true, msg: "Memakan " + label + "…" });
+      }
+      if (action === "drop1" || action === "dropall") {
+        if (action === "dropall") await within(bot.tossStack(it));
+        else await within(bot.toss(it.type, it.metadata == null ? null : it.metadata, 1));
+        addLog(`[Inventory] ${bot.username} membuang ${action === "dropall" ? it.count + "x " : "1x "}${label}`);
+        return res.json({ success: true, msg: label + " dibuang" });
+      }
+      res.json({ success: false, msg: "Aksi tidak dikenal" });
+    } catch (e) { res.json({ success: false, msg: "Gagal: " + String(e.message || e).slice(0, 80) }); }
   });
 
   // ---------- remote control dari tab Live ----------
