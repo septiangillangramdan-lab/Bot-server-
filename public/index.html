@@ -205,6 +205,13 @@ dialog p{margin:8px 0 14px}
 dialog .row{margin-top:14px;justify-content:flex-end}
 dialog .row .btn{flex:1}
 
+.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}
+.li{padding:10px 0;border-bottom:2px dashed var(--line);min-width:0;overflow-wrap:anywhere}
+.li:last-child{border-bottom:0}
+.li .tag{margin:0 8px 0 0}
+.tag.warn{color:var(--warn)}.tag.bad{color:var(--bad)}.tag.ok{color:var(--ok)}
+@media(max-width:859px){nav{gap:5px;padding:6px}nav button{min-width:0;overflow:hidden;font-size:10px;letter-spacing:0}}
 @media(prefers-reduced-motion:reduce){.blk.wait,.skel{animation:none}.world .body{transition:none}}
 
 @media(min-width:860px){
@@ -309,6 +316,44 @@ dialog .row .btn{flex:1}
       <span></span><button class="btn" data-c="jongkok">Jongkok</button><span></span></div></div>
 </section>
 
+<section id="t-patrol" class="tab">
+  <div class="panel">
+    <h2>Patroli area</h2>
+    <p class="mu" id="pt-st">Memuat…</p>
+    <label class="sw"><span>Aktifkan patroli</span><input type="checkbox" id="pt-on"></label>
+    <p class="mu" id="pt-in"></p>
+    <p class="mu" id="pt-warn" hidden>Mode Survival menyala. Gerakan survival dijeda selama patroli, tapi sebaiknya dimatikan untuk bot patroli.</p>
+  </div>
+  <div class="panel">
+    <h2>Area</h2>
+    <p class="mu">Bot berjalan keliling kotak di antara dua titik. Isi manual atau berdirikan bot di sudutnya lalu tekan “Pakai posisi bot”.</p>
+    <label>Posisi 1 (x, y, z)</label>
+    <div class="g3"><input type="number" id="p1x" inputmode="numeric" placeholder="x"><input type="number" id="p1y" inputmode="numeric" placeholder="y"><input type="number" id="p1z" inputmode="numeric" placeholder="z"></div>
+    <button class="btn sm" data-w="p1" style="margin:8px 0 12px">Pakai posisi bot</button>
+    <label>Posisi 2 (x, y, z)</label>
+    <div class="g3"><input type="number" id="p2x" inputmode="numeric" placeholder="x"><input type="number" id="p2y" inputmode="numeric" placeholder="y"><input type="number" id="p2z" inputmode="numeric" placeholder="z"></div>
+    <button class="btn sm" data-w="p2" style="margin:8px 0 12px">Pakai posisi bot</button>
+    <label>Bot yang berpatroli</label><select id="pt-bot"></select>
+    <label>Jarak antar titik patroli (blok)</label><input type="number" id="pt-step" inputmode="numeric" min="3" max="16">
+    <label>Abaikan pemain (pisahkan dengan koma)</label><input type="text" id="pt-ign" autocapitalize="off" placeholder="namamu, adminlain">
+    <label class="sw" style="margin-top:8px"><span>Notifikasi Telegram saat ada kejadian</span><input type="checkbox" id="pt-notif"></label>
+    <button class="btn go" id="pt-save" style="margin-top:12px;width:100%">Simpan area</button>
+    <p class="mu" id="pt-persist" hidden>Riwayat hilang saat panel dideploy ulang. Pasang Volume di Railway dan set DATA_DIR agar tersimpan permanen.</p>
+  </div>
+  <div class="panel">
+    <h2>Riwayat</h2>
+    <div class="chips" id="pt-r">
+      <button class="btn sm" data-r="3600000">1 jam</button><button class="btn sm on" data-r="86400000">24 jam</button><button class="btn sm" data-r="604800000">7 hari</button><button class="btn sm" data-r="0">Semua</button>
+    </div>
+    <div class="two" style="margin:0 0 8px"><div><label>Dari</label><input type="datetime-local" id="pt-from"></div><div><label>Sampai</label><input type="datetime-local" id="pt-to"></div></div>
+    <div class="two" style="margin:0 0 8px"><div><label>Nama pemain</label><input type="text" id="pt-q" autocapitalize="off" placeholder="cari nama"></div><div><label>Jenis</label><select id="pt-k"><option value="">Semua</option><option value="masuk,keluar">Masuk / keluar area</option><option value="taruh">Menaruh blok</option><option value="hancur">Menghancurkan blok</option></select></div></div>
+    <div class="two" style="margin:8px 0 0"><button class="btn" id="pt-re">Muat ulang</button><button class="btn" id="pt-csv">Unduh CSV</button></div>
+  </div>
+  <div class="panel"><h2>Daftar nama</h2><p class="mu" id="pt-pn">—</p><div id="pt-pl"></div></div>
+  <div class="panel"><h2>Kejadian</h2><p class="mu" id="pt-en">—</p><div id="pt-ev"></div>
+    <button class="btn stop sm" id="pt-clr" style="margin-top:12px">Hapus semua riwayat</button></div>
+</section>
+
 <section id="t-settings" class="tab">
   <details class="panel" open><summary data-i="server"><div><h2>Server &amp; akun</h2><span class="mu">Alamat server dan akun bot utama</span></div></summary><div class="body">
     <label>IP / hostname</label><input type="text" data-k="server.ip" autocapitalize="off">
@@ -383,6 +428,7 @@ dialog .row .btn{flex:1}
   <button class="on" data-t="status" data-i="heart">Status</button>
   <button data-t="logs" data-i="term">Log</button>
   <button data-t="live" data-i="eye">Live</button>
+  <button data-t="patrol" data-i="shield">Patroli</button>
   <button data-t="settings" data-i="gear">Pengaturan</button>
 </nav>
 </div>
@@ -463,6 +509,7 @@ function go(t){
   $('#savebar').classList.toggle('show',t==='settings'&&dirty);
   if(t==='logs')(mode==='chat'?chat:logs)(true);
   if(t==='live')live();
+  if(t==='patrol')ptOpen();
   scrollTo(0,0);
 }
 $$('nav button').forEach(b=>b.onclick=()=>go(b.dataset.t));
@@ -837,6 +884,89 @@ const kick=[
   loop(()=>(mode==='chat'?chat:logs)(),3000,()=>tab==='logs')
 ];
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)kick.forEach(f=>f())});
+
+/* ---------- patroli area ---------- */
+const PT={since:Date.now()-864e5,until:0,custom:false,filled:false};
+const fmtT=t=>new Date(t).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+const dur=s=>s<60?s+' dtk':s<3600?(s/60|0)+' mnt '+(s%60)+' dtk':(s/3600|0)+' jam '+((s%3600)/60|0)+' mnt';
+const ptPt=(k,p)=>['x','y','z'].forEach(a=>{$('#'+k+a).value=p?p[a]:''});
+function ptRead(k){
+  const v=['x','y','z'].map(a=>$('#'+k+a).value.trim());
+  if(v.every(x=>x===''))return null;
+  if(v.some(x=>x===''||isNaN(+x)))return false;
+  return{x:+v[0],y:+v[1],z:+v[2]};
+}
+function ptFill(d){
+  const c=d.cfg;
+  ptPt('p1',c.p1);ptPt('p2',c.p2);
+  $('#pt-step').value=c.step||6;$('#pt-ign').value=(c.ignore||[]).join(', ');$('#pt-notif').checked=!!c.notify;
+  const sel=$('#pt-bot');
+  sel.innerHTML='<option value="">Bot utama</option>'+d.bots.filter(b=>!b.main).map(b=>'<option value="'+esc(b.id)+'">'+esc(b.id)+(b.online?'':' (offline)')+'</option>').join('');
+  sel.value=c.bot||'';
+  PT.filled=true;
+}
+async function ptLoad(fill){
+  const d=await call('/api/patrol');if(!d||!d.success)return;
+  if(fill||!PT.filled)ptFill(d);
+  const s=d.status;
+  $('#pt-on').checked=!!d.cfg.enabled;
+  $('#pt-st').textContent=s.msg+(s.active&&s.holes?' · '+s.holes+'× menghindar lubang':'');
+  $('#pt-in').textContent=s.active?(s.inside.length?'Di dalam area sekarang: '+s.inside.join(', '):'Tidak ada pemain di dalam area.'):'';
+  $('#pt-warn').hidden=!d.survival;
+  $('#pt-persist').hidden=d.persistent;
+}
+function ptQuery(extra){
+  const q=new URLSearchParams();
+  let since=PT.since,until=PT.until;
+  if(PT.custom){since=$('#pt-from').value?+new Date($('#pt-from').value):0;until=$('#pt-to').value?+new Date($('#pt-to').value):0}
+  else if(PT.range)since=Date.now()-PT.range;
+  if(since)q.set('since',since);if(until)q.set('until',until);
+  if($('#pt-q').value.trim())q.set('player',$('#pt-q').value.trim());
+  if($('#pt-k').value)q.set('kind',$('#pt-k').value);
+  Object.entries(extra||{}).forEach(([k,v])=>q.set(k,v));
+  return q.toString();
+}
+const evText=e=>{
+  if(e.k==='masuk')return['MASUK','ok','masuk area'];
+  if(e.k==='keluar')return['KELUAR','',e.dur!=null?'keluar area (berada '+dur(e.dur)+')':'keluar area'];
+  if(e.k==='taruh')return['TARUH','warn','menaruh '+(e.n>1?e.n+'× ':'')+e.d];
+  return['HANCUR','bad','menghancurkan '+(e.n>1?e.n+'× ':'')+e.d];
+};
+async function ptLog(){
+  const d=await call('/api/patrol/log?'+ptQuery({limit:150}));if(!d||!d.success)return;
+  $('#pt-pn').textContent=d.players.length?d.players.length+' pemain tercatat pada rentang ini.':'Belum ada pemain tercatat pada rentang ini.';
+  $('#pt-pl').innerHTML=d.players.map(p=>'<div class="li"><b>'+esc(p.p)+'</b><div class="mu">Pertama '+fmtT(p.first)+' · terakhir '+fmtT(p.last)+'<br>masuk '+p.masuk+'× · menaruh '+p.taruh+' blok · menghancurkan '+p.hancur+' blok</div></div>').join('');
+  $('#pt-en').textContent=d.total?(d.total>d.rows.length?'Menampilkan '+d.rows.length+' terbaru dari '+d.total+' kejadian.':d.total+' kejadian.'):'Belum ada kejadian.';
+  $('#pt-ev').innerHTML=d.rows.map(e=>{const t=evText(e);return '<div class="li"><span class="tag '+t[1]+'">'+t[0]+'</span><b>'+esc(e.p)+'</b> '+esc(t[2])+'<div class="mu">'+fmtT(e.t)+(e.t2&&e.t2-e.t>1500?' – '+fmtT(e.t2).slice(-8):'')+(e.x!=null?' · '+e.x+' '+e.y+' '+e.z:'')+'</div></div>'}).join('');
+}
+function ptOpen(){ptLoad(true);ptLog()}
+async function ptSave(extra){
+  const p1=ptRead('p1'),p2=ptRead('p2');
+  if(p1===false||p2===false)return toast('Koordinat harus diisi lengkap (x, y, z)',true);
+  const d=await call('/api/patrol/config',{p1,p2,bot:$('#pt-bot').value,step:+$('#pt-step').value||6,ignore:$('#pt-ign').value,notify:$('#pt-notif').checked,...(extra||{})});
+  res(d,'Pengaturan patroli disimpan');
+  if(d.success)ptLoad(true);
+  return d;
+}
+$('#pt-save').onclick=()=>ptSave();
+$('#pt-on').onchange=async e=>{const d=await ptSave({enabled:e.target.checked});if(!d||!d.success)e.target.checked=!e.target.checked};
+$$('[data-w]').forEach(b=>b.onclick=async()=>{
+  const d=await call('/api/patrol/here',{which:b.dataset.w,bot:$('#pt-bot').value});
+  res(d,'Koordinat diambil dari posisi bot');
+  if(d.success)ptPt(b.dataset.w,d.point);
+});
+PT.range=864e5;
+$$('#pt-r [data-r]').forEach(b=>b.onclick=()=>{
+  PT.custom=false;PT.range=+b.dataset.r;$('#pt-from').value='';$('#pt-to').value='';
+  $$('#pt-r [data-r]').forEach(x=>x.classList.toggle('on',x===b));ptLog();
+});
+['#pt-from','#pt-to'].forEach(i=>$(i).onchange=()=>{PT.custom=!!($('#pt-from').value||$('#pt-to').value);$$('#pt-r [data-r]').forEach(x=>x.classList.toggle('on',!PT.custom&&+x.dataset.r===PT.range));ptLog()});
+$('#pt-q').oninput=()=>{clearTimeout(PT.qt);PT.qt=setTimeout(ptLog,350)};
+$('#pt-k').onchange=ptLog;$('#pt-re').onclick=ptLog;
+$('#pt-csv').onclick=()=>{location.href='/api/patrol/log.csv?'+ptQuery()};
+$('#pt-clr').onclick=async()=>{if(!await ask({title:'Hapus riwayat patroli?',text:'Semua catatan pemain dan blok akan dihapus.',ok:'Hapus',danger:true}))return;res(await call('/api/patrol/log/clear',{}),'Riwayat dihapus');ptLog()};
+setInterval(()=>{if(tab==='patrol'&&!document.hidden){ptLoad(false);ptLog()}},5000);
+
 addEventListener('hashchange',()=>{const t=location.hash.slice(1);if(t!==tab&&$('#t-'+t))go(t)});
 if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 load();
