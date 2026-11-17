@@ -1,12 +1,12 @@
 {
   "name": "AFK Bot",
   "bot-account": {
-    "username": "Gibran",
+    "username": "SoloCloudHosting",
     "password": "",
     "type": "offline"
   },
   "server": {
-    "ip": "ambatukanmmm.mcsh.gg",
+    "ip": "solocloud.site",
     "port": 25565,
     "version": "1.20.1",
     "try-creative": false
@@ -31,7 +31,9 @@
       "repeat": true,
       "repeat-delay": 120,
       "messages": [
-        "AMBATUKANMMM"
+        "I'm a regular player",
+        "Subscribe to SoloPlayz!",
+        "Want Cheap Premium Server? https://discord.gg/VRMUnDkf95"
       ]
     },
     "chat-log": true,
