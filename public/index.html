@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="id"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>MC Bot - Minecraft Bot Panel</title>
+<title>Panel AFK Bot</title>
 <script>try{document.documentElement.dataset.theme=localStorage.getItem('th')||(matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light')}catch(e){}</script>
-<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="#0a0612"><link rel="icon" type="image/png" href="/favicon-64.png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="MC Bot">
+<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><meta name="theme-color" content="#0e1530"><link rel="icon" href="/icon-192.png"><link rel="apple-touch-icon" href="/icon-192.png">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;600;700&family=Pixelify+Sans:wght@500;700&display=swap">
 <style>
 :root{color-scheme:light;--bg:#d9edf7;--panel:#f6f8f4;--ink:#2b2118;--mu:#566150;--edge:#2b2118;--field:#fff;--line:#c3cdb9;--stone:#dfe5d8;--hi:#ffffff80;--lo:#0000002e;--grass:#3f8524;--red:#b3321f;--lapis:#2f5fc4;--ok:#3f8524;--wait:#c98a00;--bad:#b3321f;--warn:#8a5d00;--slot:#b7bfae;--sky:#8ec9ee;--sky2:#bfe3f7;--term:#0b1020;--termink:#a7b2d6}
@@ -555,12 +555,11 @@ dialog{background:var(--panel);border-radius:22px}
 }
 @media(prefers-reduced-motion:reduce){body::after,.world .body,.world .cl{animation:none!important}}
 
-.brand img{width:40px;height:40px;border-radius:12px;box-shadow:0 0 14px #a855f755,0 0 0 1px var(--edge);animation:logo-float 4s ease-in-out infinite;transition:transform .3s}.brand:hover img{transform:rotate(-6deg) scale(1.08)}#install{display:none}#install.show{display:inline-flex}@media(prefers-reduced-motion:reduce){.brand img{animation:none!important}}</style></head>
+</style></head>
 <body>
 <div class="app">
 <header class="top">
-  <div class="brand"><img src="/logo.png" alt="MC Bot" width="40" height="40"><h1>MC Bot</h1></div>
-  <button class="btn" id="install" aria-label="Pasang aplikasi">Pasang aplikasi</button>
+  <div class="brand"><svg viewBox="0 0 8 8" aria-hidden="true"><rect width="8" height="8" fill="#6b4a2f"/><rect width="8" height="3" fill="#4a9a2c"/><rect x="1" y="3" width="1" height="1" fill="#4a9a2c"/><rect x="5" y="3" width="2" height="1" fill="#4a9a2c"/><rect x="2" y="5" width="1" height="1" fill="#85613f"/><rect x="6" y="6" width="1" height="1" fill="#85613f"/></svg><h1>Panel AFK Bot</h1></div>
   <button class="btn" id="theme" aria-label="Ganti tema siang atau malam"></button>
 </header>
 
@@ -642,6 +641,22 @@ dialog{background:var(--panel);border-radius:22px}
 </section>
 
 <section id="t-patrol" class="tab">
+  <div class="chips" id="pt-seg"><button class="btn sm on" data-seg="patrol">Patroli</button><button class="btn sm" data-seg="build">Bangun</button></div>
+  <div id="pt-build" hidden>
+    <div class="panel">
+      <h2>Bangun otonom</h2>
+      <p class="mu" id="bd-key">Memuat…</p>
+      <label>Perintah ke bot</label>
+      <textarea id="bd-goal" rows="3" maxlength="300" placeholder="contoh: bangun rumah kayu kecil yang nyaman"></textarea>
+      <label>Bot</label><select id="bd-bot"></select>
+      <div class="two" style="margin-top:12px"><button class="btn go" id="bd-start">Mulai</button><button class="btn stop" id="bd-stop">Berhenti</button></div>
+      <p class="mu" style="margin-top:12px">Bot merancang bangunan, memilih lahan, mengumpulkan bahan, crafting, lalu membangun sendiri. Hanya bangunan dari blok biasa (tanpa air, redstone, pintu, tangga), jadi farm yang butuh air atau redstone hanya didekati dengan bentuk statis.</p>
+    </div>
+    <div class="panel"><h2>Status</h2><p class="mu" id="bd-st">Belum ada proyek.</p><progress id="bd-bar" max="100" value="0" style="width:100%"></progress><div id="bd-plan"></div></div>
+    <div class="panel"><h2>Bahan</h2><div id="bd-need"><p class="mu">—</p></div></div>
+    <div class="panel"><h2>Catatan kerja</h2><div id="bd-log"><p class="mu">—</p></div></div>
+  </div>
+  <div id="pt-patrol">
   <div class="panel">
     <h2>Patroli area</h2>
     <p class="mu" id="pt-st">Memuat…</p>
@@ -677,6 +692,7 @@ dialog{background:var(--panel);border-radius:22px}
   <div class="panel"><h2>Daftar nama</h2><p class="mu" id="pt-pn">—</p><div id="pt-pl"></div></div>
   <div class="panel"><h2>Kejadian</h2><p class="mu" id="pt-en">—</p><div id="pt-ev"></div>
     <button class="btn stop sm" id="pt-clr" style="margin-top:12px">Hapus semua riwayat</button></div>
+  </div>
 </section>
 
 <section id="t-settings" class="tab">
@@ -700,6 +716,8 @@ dialog{background:var(--panel);border-radius:22px}
     <label class="sw"><span>Mode manusia (lompati rintangan, hindari lubang)</span><input type="checkbox" data-k="movement.human.enabled"></label>
     <label class="sw"><span>Hancurkan blok yang menghalangi</span><input type="checkbox" data-k="movement.human.dig"></label>
     <label class="sw"><span>Perilaku natural (menoleh halus, jeda, ngetik, makan)</span><input type="checkbox" data-k="movement.human.natural"></label>
+    <label class="sw"><span>Naik / menyeberang dengan menaruh blok</span><input type="checkbox" data-k="movement.human.build"></label>
+    <label class="sw"><span>Balas serangan pemain</span><input type="checkbox" data-k="combat.fight-back"></label>
     <label class="sw"><span>Mode survival (makan, lawan mob, craft)</span><input type="checkbox" data-k="modules.survival"></label>
     <label class="sw"><span>Combat sederhana</span><input type="checkbox" data-k="modules.combat"></label>
     <label class="sw"><span>Chat otomatis</span><input type="checkbox" data-k="utils.chat-messages.enabled"></label>
@@ -756,7 +774,7 @@ dialog{background:var(--panel);border-radius:22px}
   <button class="on" data-t="status" data-i="heart">Status</button>
   <button data-t="logs" data-i="term">Log</button>
   <button data-t="live" data-i="eye">Live</button>
-  <button data-t="patrol" data-i="shield">Patroli</button>
+  <button data-t="patrol" data-i="shield">Tugas</button>
   <button data-t="settings" data-i="gear">Pengaturan</button>
 </nav>
 </div>
@@ -898,7 +916,7 @@ async function status(){
   $('#cnt2').textContent=iss?iss+' bermasalah':on===B.length&&B.length?'Semua sehat':' ';
   $('#pup').textContent=fmt(d.uptime);
   $('#start').disabled=!B.length||B.every(b=>b.running);$('#stop').disabled=!run;$('#restart').disabled=!run;
-  document.title=(B.length?'('+on+'/'+B.length+') ':'')+'MC Bot';
+  document.title=(B.length?'('+on+'/'+B.length+') ':'')+'Panel AFK Bot';
   const nb=$('nav [data-t=status] .badge');
   const bad=B.filter(b=>b.running&&!b.connected).length;
   if(bad&&!nb)$('nav [data-t=status]').insertAdjacentHTML('beforeend','<span class="badge" aria-label="'+bad+' bot belum terhubung">'+bad+'</span>');
@@ -1293,12 +1311,41 @@ $('#pt-q').oninput=()=>{clearTimeout(PT.qt);PT.qt=setTimeout(ptLog,350)};
 $('#pt-k').onchange=ptLog;$('#pt-re').onclick=ptLog;
 $('#pt-csv').onclick=()=>{location.href='/api/patrol/log.csv?'+ptQuery()};
 $('#pt-clr').onclick=async()=>{if(!await ask({title:'Hapus riwayat patroli?',text:'Semua catatan pemain dan blok akan dihapus.',ok:'Hapus',danger:true}))return;res(await call('/api/patrol/log/clear',{}),'Riwayat dihapus');ptLog()};
-setInterval(()=>{if(tab==='patrol'&&!document.hidden){ptLoad(false);ptLog()}},5000);
+setInterval(()=>{if(tab==='patrol'&&BD.seg==='patrol'&&!document.hidden){ptLoad(false);ptLog()}},5000);
+
+
+/* ---------- bangun otonom ---------- */
+const BD={seg:'patrol',fill:false};
+async function bdLoad(){
+  const d=await call('/api/build');if(!d||!d.success)return;
+  $('#bd-key').textContent=d.hasKey?'Kunci API terpasang (model '+d.model+').':'ANTHROPIC_API_KEY belum diisi. Tambahkan di Railway → Variables agar bot bisa merancang.';
+  const sel=$('#bd-bot'),cur=sel.value;
+  sel.innerHTML=d.bots.map(b=>'<option value="'+esc(b.id)+'">'+esc(b.id)+(b.online?'':' (offline)')+'</option>').join('');
+  if(cur)sel.value=cur;
+  const b=d.bots.find(x=>x.id===sel.value)||d.bots.find(x=>x.status&&x.status.running)||d.bots[0];
+  const s=b&&b.status;
+  if(!s){$('#bd-st').textContent='Belum ada proyek.';return}
+  $('#bd-st').textContent=s.phase+(s.msg?' · '+s.msg:'')+(s.error?' · '+s.error:'');
+  $('#bd-bar').value=s.total?Math.round(s.done*100/s.total):0;
+  $('#bd-plan').innerHTML=s.plan?'<div class="li"><b>'+esc(s.plan.name)+'</b> · '+s.plan.size.w+'×'+s.plan.size.d+'×'+s.plan.size.h+' · '+s.plan.blocks+' blok<div class="mu">'+esc(s.plan.description||'')+(s.origin?'<br>Lokasi: '+s.origin.x+' '+s.origin.y+' '+s.origin.z:'')+'</div></div>':'';
+  $('#bd-need').innerHTML=s.need&&s.need.length?s.need.map(n=>'<div class="li"><b>'+esc(n.name)+'</b> <span class="tag '+(n.have>=n.need?'ok':'warn')+'">'+n.have+' / '+n.need+'</span></div>').join(''):'<p class="mu">—</p>';
+  $('#bd-log').innerHTML=s.lines&&s.lines.length?s.lines.slice().reverse().map(l=>'<div class="li mu">'+esc(l)+'</div>').join(''):'<p class="mu">—</p>';
+}
+$$('#pt-seg [data-seg]').forEach(b=>b.onclick=()=>{
+  BD.seg=b.dataset.seg;
+  $$('#pt-seg [data-seg]').forEach(x=>x.classList.toggle('on',x===b));
+  $('#pt-patrol').hidden=BD.seg!=='patrol';$('#pt-build').hidden=BD.seg!=='build';
+  if(BD.seg==='build')bdLoad();
+});
+$('#bd-start').onclick=async()=>{
+  const goal=$('#bd-goal').value.trim();
+  const d=await call('/api/build/start',{bot:$('#bd-bot').value,goal});
+  res(d,'Perintah dikirim ke bot');bdLoad();
+};
+$('#bd-stop').onclick=async()=>{res(await call('/api/build/stop',{}),'Menghentikan proyek');bdLoad()};
+setInterval(()=>{if(tab==='patrol'&&BD.seg==='build'&&!document.hidden)bdLoad()},3000);
 
 addEventListener('hashchange',()=>{const t=location.hash.slice(1);if(t!==tab&&$('#t-'+t))go(t)});
-let _ip=null;window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();_ip=e;const b=document.getElementById('install');if(b)b.classList.add('show')});
-document.getElementById('install')&&document.getElementById('install').addEventListener('click',async()=>{if(!_ip)return;_ip.prompt();try{await _ip.userChoice}catch(e){}_ip=null;document.getElementById('install').classList.remove('show')});
-window.addEventListener('appinstalled',()=>{const b=document.getElementById('install');if(b)b.classList.remove('show')});
 if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
 load();
 if($('#t-'+location.hash.slice(1)))go(location.hash.slice(1));
