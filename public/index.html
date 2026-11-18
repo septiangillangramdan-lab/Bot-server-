@@ -1318,7 +1318,7 @@ setInterval(()=>{if(tab==='patrol'&&BD.seg==='patrol'&&!document.hidden){ptLoad(
 const BD={seg:'patrol',fill:false};
 async function bdLoad(){
   const d=await call('/api/build');if(!d||!d.success)return;
-  $('#bd-key').textContent=d.hasKey?'Kunci API terpasang (model '+d.model+').':'ANTHROPIC_API_KEY belum diisi. Tambahkan di Railway → Variables agar bot bisa merancang.';
+  $('#bd-key').textContent=d.hasKey?'Kunci API terpasang ('+d.provider+', model '+d.model+').':'Kunci API belum diisi. Tambahkan ANTHROPIC_API_KEY atau OPENAI_API_KEY di Railway → Variables agar bot bisa merancang.';
   const sel=$('#bd-bot'),cur=sel.value;
   sel.innerHTML=d.bots.map(b=>'<option value="'+esc(b.id)+'">'+esc(b.id)+(b.online?'':' (offline)')+'</option>').join('');
   if(cur)sel.value=cur;
