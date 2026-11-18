@@ -131,7 +131,32 @@ async function callClaude(system, user) {
   const j = await res.json();
   return (j.content || []).filter((c) => c.type === "text").map((c) => c.text).join("");
 }
-let llm = callClaude;
+// OpenAI (atau layanan yang kompatibel, mis. OpenRouter/Groq lewat OPENAI_BASE_URL)
+async function callOpenAI(system, user) {
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) throw new Error("OPENAI_API_KEY belum diisi (Railway → Variables)");
+  const base = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/+$/, "");
+  const res = await fetch(base + "/chat/completions", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: "Bearer " + key },
+    body: JSON.stringify(Object.assign(
+      { model: process.env.OPENAI_MODEL || "gpt-4o", max_completion_tokens: Number(process.env.OPENAI_MAX_TOKENS) || 12000, response_format: { type: "json_object" }, messages: [{ role: "system", content: system }, { role: "user", content: user }] },
+      process.env.OPENAI_REASONING ? { reasoning_effort: process.env.OPENAI_REASONING } : {} // opsional: low | medium | high | none
+    )),
+  });
+  if (!res.ok) throw new Error(`OpenAI API ${res.status}: ${(await res.text()).slice(0, 160)}`);
+  const j = await res.json();
+  return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "";
+}
+// penyedia: AI_PROVIDER=openai|anthropic; bila kosong, pakai yang kuncinya terisi (Anthropic diutamakan)
+function provider() {
+  const p = String(process.env.AI_PROVIDER || "").toLowerCase();
+  if (p === "openai" || p === "anthropic") return p;
+  return !process.env.ANTHROPIC_API_KEY && process.env.OPENAI_API_KEY ? "openai" : "anthropic";
+}
+const hasKey = () => !!(provider() === "openai" ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY);
+const modelName = () => (provider() === "openai" ? process.env.OPENAI_MODEL || "gpt-4o" : process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
+let llm = (system, user) => (provider() === "openai" ? callOpenAI(system, user) : callClaude(system, user));
 
 // ---------- per bot ----------
 function attach(bot, mcData, botState, config, log, addInterval) {
@@ -366,12 +391,12 @@ function routes(app, manager, config, addLog) {
   const pick = (id) => manager.list.find((b) => b.id === id && b.botState.connected) || manager.list.find((b) => b.botState.connected);
   app.get("/api/build", (req, res) => {
     const out = manager.list.map((b) => { const s = b.botState.build; return { id: b.id, online: !!b.botState.connected, status: s ? { running: s.running, phase: s.phase, msg: s.msg, done: s.done, total: s.total, plan: s.plan, need: s.need, origin: s.origin, error: s.error, lines: s.lines.slice(-14) } : null }; });
-    res.json({ success: true, hasKey: !!process.env.ANTHROPIC_API_KEY, model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5", bots: out, limits: LIMITS });
+    res.json({ success: true, hasKey: hasKey(), provider: provider(), model: modelName(), bots: out, limits: LIMITS });
   });
   app.post("/api/build/start", (req, res) => {
     const b = pick((req.body || {}).bot);
     if (!b || !b.botState.buildStart) return res.json({ success: false, msg: "Tidak ada bot online" });
-    if (!process.env.ANTHROPIC_API_KEY) return res.json({ success: false, msg: "ANTHROPIC_API_KEY belum diisi di Railway (Variables)" });
+    if (!hasKey()) return res.json({ success: false, msg: provider() === "openai" ? "OPENAI_API_KEY belum diisi di Railway (Variables)" : "ANTHROPIC_API_KEY atau OPENAI_API_KEY belum diisi di Railway (Variables)" });
     const r = b.botState.buildStart((req.body || {}).goal);
     addLog(`[Bangun] Perintah: "${String((req.body || {}).goal || "").slice(0, 80)}" -> ${r}`);
     res.json({ success: r === "dimulai", msg: r, bot: b.id });
@@ -382,4 +407,4 @@ function routes(app, manager, config, addLog) {
   });
 }
 
-module.exports = { attach, routes, _t: { parseBlueprint, resolveBlock, tally, findSite, mainWood, plannerPrompts, setLLM: (f) => { llm = f; }, LIMITS } };
+module.exports = { attach, routes, _t: { callOpenAI, provider, hasKey, modelName, parseBlueprint, resolveBlock, tally, findSite, mainWood, plannerPrompts, setLLM: (f) => { llm = f; }, LIMITS } };
