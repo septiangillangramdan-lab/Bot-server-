@@ -127,10 +127,24 @@ async function callClaude(system, user) {
     headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({ model: process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5", max_tokens: 6000, system, messages: [{ role: "user", content: user }] }),
   });
-  if (!res.ok) throw new Error(`Claude API ${res.status}: ${(await res.text()).slice(0, 160)}`);
+  if (!res.ok) { const e = new Error(`Claude API ${res.status}: ${(await res.text()).replace(/\s+/g, " ").slice(0, 500)}`); e.status = res.status; throw e; }
   const j = await res.json();
   return (j.content || []).filter((c) => c.type === "text").map((c) => c.text).join("");
 }
+// coba ulang otomatis saat server AI sibuk (429, 5xx) atau jaringan putus; error lain (kunci salah, model salah) langsung gagal
+async function withRetry(fn, onRetry, delays) {
+  delays = delays || [3000, 8000, 15000, 30000];
+  for (let i = 0; ; i++) {
+    try { return await fn(); }
+    catch (e) {
+      const retryable = e.status === 429 || e.status >= 500 || (!e.status && /fetch failed|ECONN|ETIMEDOUT|ENOTFOUND|network|socket/i.test(String(e.message) + String(e.cause || "")));
+      if (!retryable || i >= delays.length) throw e;
+      if (onRetry) onRetry(i + 1, e, delays[i], delays.length);
+      await sleep(delays[i]);
+    }
+  }
+}
+
 // OpenAI (atau layanan yang kompatibel, mis. OpenRouter/Groq lewat OPENAI_BASE_URL)
 async function callOpenAI(system, user) {
   const key = process.env.OPENAI_API_KEY;
@@ -144,7 +158,7 @@ async function callOpenAI(system, user) {
       process.env.OPENAI_REASONING ? { reasoning_effort: process.env.OPENAI_REASONING } : {} // opsional: low | medium | high | none
     )),
   });
-  if (!res.ok) throw new Error(`OpenAI API ${res.status}: ${(await res.text()).slice(0, 160)}`);
+  if (!res.ok) { const e = new Error(`OpenAI API ${res.status}: ${(await res.text()).replace(/\s+/g, " ").slice(0, 500)}`); e.status = res.status; throw e; }
   const j = await res.json();
   return (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || "";
 }
@@ -315,7 +329,10 @@ function attach(bot, mcData, botState, config, log, addInterval) {
       let bp = null, lastErr = "";
       for (let attempt = 1; attempt <= 2 && !bp; attempt++) {
         const { system, user } = plannerPrompts(goal, ctx);
-        const raw = await llm(system, lastErr ? user + `\nYour previous answer was invalid: ${lastErr}. Fix it and return only the JSON.` : user);
+        const raw = await withRetry(() => llm(system, lastErr ? user + `\nYour previous answer was invalid: ${lastErr}. Fix it and return only the JSON.` : user), (n, e, d, max) => {
+          if (!up()) throw new Error("dihentikan");
+          say(`Server AI sibuk (${e.status || "jaringan"}), mencoba lagi dalam ${Math.round(d / 1000)} dtk (${n}/${max})`);
+        });
         try { bp = parseBlueprint(raw, ctx); } catch (e) { lastErr = e.message; say(`Rancangan ditolak (${e.message})${attempt < 2 ? ", mencoba lagi" : ""}`); }
       }
       if (!bp) throw new Error("gagal mendapat rancangan yang valid: " + lastErr);
@@ -407,4 +424,4 @@ function routes(app, manager, config, addLog) {
   });
 }
 
-module.exports = { attach, routes, _t: { callOpenAI, provider, hasKey, modelName, parseBlueprint, resolveBlock, tally, findSite, mainWood, plannerPrompts, setLLM: (f) => { llm = f; }, LIMITS } };
+module.exports = { attach, routes, _t: { withRetry, callOpenAI, provider, hasKey, modelName, parseBlueprint, resolveBlock, tally, findSite, mainWood, plannerPrompts, setLLM: (f) => { llm = f; }, LIMITS } };
