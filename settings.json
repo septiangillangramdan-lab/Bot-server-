@@ -59,7 +59,8 @@
     "human": {
       "enabled": true,
       "dig": true,
-      "natural": true
+      "natural": true,
+      "build": true
     }
   },
   "modules": {
@@ -71,7 +72,8 @@
   },
   "combat": {
     "attack-mobs": true,
-    "auto-eat": true
+    "auto-eat": true,
+    "fight-back": true
   },
   "beds": {
     "pick-up-day": false,
@@ -88,25 +90,5 @@
   },
   "chat": {
     "respond": true
-  },
-  "autonomy": {
-    "enabled": true,
-    "auto": true,
-    "owners": [],
-    "combat": {
-      "mobs": true,
-      "players": "defend",
-      "flee-health": 6
-    },
-    "build": {
-      "auto": true,
-      "size": 5,
-      "material": "auto",
-      "door": true
-    },
-    "progress": {
-      "enabled": true,
-      "max-tier": "iron"
-    }
   }
 }

@@ -89,8 +89,8 @@ function attach(bot, log, addInterval, botState) {
   const isStandable = (b) => b && b.boundingBox === "block" && !DANGER.test(b.name);
 
   function movements() {
-    const hm = (ctx.config && ctx.config.movement && ctx.config.movement.human) || {};
-    const m = human.applyMovements(new Movements(bot), bot.registry, hm.dig !== false); // lompat 1 blok & hancurkan penghalang
+    const hs = human.fromConfig(ctx.config);
+    const m = human.applyMovements(new Movements(bot), bot.registry, hs.dig, false); // lompat 1 blok & hancurkan penghalang
     m.allow1by1towers = false;
     m.allowParkour = false;
     m.maxDropDown = 2;
@@ -227,6 +227,7 @@ function attach(bot, log, addInterval, botState) {
       st.target = null; st.cool = 0;
     }
 
+    if (botState.fighting || botState.task) { st.target = null; status.msg = botState.task ? "Sedang membangun" : "Sedang bertarung"; return; }
     if (!st.wp.length) { status.msg = "Tidak ada titik patroli"; return; }
     if (now < st.cool) return;
 

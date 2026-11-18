@@ -113,7 +113,7 @@ function attach(bot, mcData, botState, config, log, addInterval) {
 
   // ---------- 2 & 5. ritme idle + aktivitas kecil ----------
   const moving = () => !!(bot.pathfinder && bot.pathfinder.isMoving && bot.pathfinder.isMoving());
-  const busy = () => botState.patrolActive || botState.autoBusy || botState.walking || st.eating || st.moving || moving() || !!bot.targetDigBlock;
+  const busy = () => botState.patrolActive || botState.fighting || botState.task || botState.walking || st.eating || st.moving || moving() || !!bot.targetDigBlock;
   const ctl = (k, v) => { try { bot.setControlState(k, v); } catch (e) {} };
 
   const actions = [
@@ -132,8 +132,35 @@ function attach(bot, mcData, botState, config, log, addInterval) {
   const total = actions.reduce((s, a) => s + a[0], 0);
   const pickAction = () => { let r = Math.random() * total; for (const a of actions) { if ((r -= a[0]) <= 0) return a[1]; } return actions[0][1]; };
 
+  // jatuh / masuk ke air: mengapung lalu berenang ke tepi terdekat
+  function rescueWater() {
+    if (!bot.entity.isInWater) { if (st.swimming) { st.swimming = false; ctl("jump", false); } return false; }
+    if (botState.patrolActive || botState.fighting || botState.task) return false;
+    st.swimming = true; ctl("jump", true); // mengapung
+    if (moving() || st.moving) return true;
+    try {
+      const Vec3 = bot.entity.position.constructor;
+      const shore = bot.findBlock({
+        maxDistance: 14,
+        matching: (b) => {
+          if (!b || b.boundingBox !== "block" || HURT.test(b.name)) return false;
+          const u1 = bot.blockAt(b.position.offset(0, 1, 0)), u2 = bot.blockAt(b.position.offset(0, 2, 0));
+          return u1 && u2 && u1.boundingBox === "empty" && u2.boundingBox === "empty" && !/water|lava/.test(u1.name);
+        },
+      });
+      if (shore) {
+        const m = human.applyMovements(new Movements(bot), registry, false, false);
+        bot.pathfinder.setMovements(m);
+        bot.pathfinder.setGoal(new GoalNear(shore.position.x + 0.5, shore.position.y + 1, shore.position.z + 0.5, 1));
+        st.moving = true; st.movingSince = Date.now();
+        log("[Manusia] Di dalam air, berenang ke tepi");
+      }
+    } catch (e) {}
+    return true;
+  }
+
   async function eatIfHungry() {
-    if ((config.modules && config.modules.survival) || (config.autonomy && config.autonomy.enabled)) return; // survival/autonomy sudah mengurus makan
+    if (config.modules && config.modules.survival) return; // survival sudah mengurus makan
     if (st.eating || bot.food == null || bot.food > 14 || Date.now() - st.lastEat < 20000 || busy()) return;
     const foods = registry && registry.foods;
     if (!foods) return;
@@ -168,7 +195,7 @@ function attach(bot, mcData, botState, config, log, addInterval) {
       const y = groundNear(x, Math.floor(home.y), z);
       if (y == null) continue;
       try {
-        const m = human.applyMovements(new Movements(bot), registry, false);
+        const m = human.applyMovements(new Movements(bot), registry, false, false);
         m.allowParkour = false; m.maxDropDown = 2;
         bot.pathfinder.setMovements(m);
         bot.pathfinder.setGoal(new GoalNear(x + 0.5, y, z + 0.5, 1.5));
@@ -183,6 +210,7 @@ function attach(bot, mcData, botState, config, log, addInterval) {
     try {
       if (!up()) return;
       const now = Date.now();
+      if (rescueWater()) return; // di air: mengapung & berenang ke tepi
       if (st.moving) {
         if (!moving() && now - st.movingSince > 2500) { st.moving = false; try { bot.pathfinder.setGoal(null); } catch (e) {} }
         else if (now - st.movingSince > 25000) { st.moving = false; try { bot.pathfinder.setGoal(null); } catch (e) {} }

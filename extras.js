@@ -43,13 +43,14 @@ function notify(text) {
 // ---------- /goto /follow /come /stop ----------
 function command(cmd, targets) {
   const [c, ...a] = cmd.trim().split(/\s+/);
-  if (!["/goto", "/follow", "/come", "/stop"].includes(c)) return null;
+  if (!["/goto", "/follow", "/come", "/stop", "/attack"].includes(c)) return null;
   return targets.map((b) => {
     const bot = b.bot;
     if (!bot || !b.botState.connected || !bot.pathfinder) return `[${b.name}] belum terhubung`;
     try {
-      { const hm = (require("./settings.json").movement || {}).human; bot.pathfinder.setMovements(require("./human").applyMovements(new Movements(bot), bot.registry, !hm || hm.dig !== false)); }
-      if (c === "/stop") { bot.pathfinder.setGoal(null); return `[${b.name}] berhenti`; }
+      { const hs = require("./human").fromConfig(require("./settings.json")); bot.pathfinder.setMovements(require("./human").applyMovements(new Movements(bot), bot.registry, hs.dig, hs.place)); }
+      if (c === "/attack") return `[${b.name}] ` + (b.botState.fight ? b.botState.fight(a.join(" ")) : "fitur tempur belum aktif");
+      if (c === "/stop") { if (b.botState.stopFight) b.botState.stopFight(); bot.pathfinder.setGoal(null); return `[${b.name}] berhenti`; }
       if (c === "/goto") {
         const [x, y, z] = a.map(Number);
         if (a.length < 3 || [x, y, z].some(Number.isNaN)) return "Format: /goto x y z";

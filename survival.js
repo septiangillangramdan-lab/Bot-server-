@@ -126,6 +126,6 @@ module.exports = function survival(bot, mcData, move, log, addInterval, botState
   }
 
   addInterval(guard, 500);
-  addInterval(() => { if (botState && botState.patrolActive) return; work(); }, 1000); // patroli mengambil alih gerakan
+  addInterval(() => { if (botState && (botState.patrolActive || botState.task)) return; work(); }, 1000); // patroli mengambil alih gerakan
   log("[Survival] Mode survival aktif");
 };

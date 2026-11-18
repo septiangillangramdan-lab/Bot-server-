@@ -8,7 +8,7 @@ const { GoalBlock } = goals;
 const config = require("./settings.json");
 // Mode manusia: lompati rintangan, hindari lubang, hancurkan blok penghalang (bisa dimatikan di Pengaturan)
 config.movement = config.movement || {};
-if (!config.movement.human) config.movement.human = { enabled: true, dig: true, natural: true };
+if (!config.movement.human) config.movement.human = { enabled: true, dig: true, natural: true, build: true };
 const naturalOn = () => { const h = config.movement.human; return !h || (h.enabled !== false && h.natural !== false); };
 const express = require("express");
 const http = require("http");
@@ -1183,15 +1183,11 @@ app.post("/command", (req, res) => {
     const lines = [
       "/help  /pos  /status  /list  /say <msg>",
       "/goto x y z  /follow <player>  /come <player>  /stop",
-      "Mode manusia: /auto on|off  /build [ukuran]  /collect <item> [n]  /craft <item> [n]  /kill <pemain|mob>  /pillar [n]  /cancel  /autostatus",
       "/<anything> = Minecraft command, plain text = chat",
     ];
     lines.forEach((l) => addLog(`[Console] ${l}`));
     return res.json({ success: true, msg: lines.join("\n") });
   }
-
-  const au = require("./autonomy").command(cmd, targets);
-  if (au) { au.forEach((l) => addLog(`[Console] ${l}`)); return res.json({ success: true, msg: au.join("\n") }); }
 
   const mv = require("./extras").command(cmd, targets);
   if (mv) { mv.forEach((l) => addLog(`[Console] ${l}`)); return res.json({ success: true, msg: mv.join("\n") }); }
@@ -1299,7 +1295,7 @@ function makeBot(id, account, baseConfig) {
   const config = Object.assign({}, baseConfig, {
     "bot-account": Object.assign({}, baseConfig["bot-account"], account),
   });
-  if ((baseConfig.modules && baseConfig.modules.survival) || (baseConfig.autonomy && baseConfig.autonomy.enabled)) {
+  if (baseConfig.modules && baseConfig.modules.survival) {
     // survival replaces random walking / blind combat, which would fight over the pathfinder
     config.movement = Object.assign({}, baseConfig.movement, { enabled: false });
     config.position = Object.assign({}, baseConfig.position, { enabled: false });
@@ -1477,7 +1473,7 @@ function makeBot(id, account, baseConfig) {
         defaultMove.canDig = false;
         defaultMove.liquidCost = 1000;
         defaultMove.fallDamageCost = 1000;
-        require("./human").applyMovements(defaultMove, mcData, config.movement.human.dig !== false);
+        { const hs = require("./human").fromConfig(config); require("./human").applyMovements(defaultMove, mcData, hs.dig, hs.place); }
 
         initializeModules(bot, mcData, defaultMove);
 
@@ -1789,7 +1785,7 @@ function makeBot(id, account, baseConfig) {
             )
               return;
             try {
-              if (botState.patrolActive) return;
+              if (botState.patrolActive || botState.fighting || botState.task) return;
               const hum = config.movement && config.movement.human;
               if (!hum || hum.enabled !== false) {
                 require("./human").walk(bot, botState, addLog, !hum || hum.dig !== false);
@@ -1867,12 +1863,12 @@ function makeBot(id, account, baseConfig) {
     if (config.modules.chat) {
       chatModule(bot);
     }
-    const autoOn = !!(config.autonomy && config.autonomy.enabled);
-    if (config.modules.survival && !autoOn) require("./survival")(bot, mcData, defaultMove, addLog, addInterval, botState);
+    if (config.modules.survival) require("./survival")(bot, mcData, defaultMove, addLog, addInterval, botState);
     try { require("./extras").attach(bot, mcData, defaultMove, addLog, addInterval, config, botState); } catch (e) { addLog("[Extras] " + e.message); }
     try { require("./patrol").attach(bot, addLog, addInterval, botState); } catch (e) { addLog("[Patroli] " + e.message); }
-    if (autoOn) { try { require("./autonomy").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Auto] " + e.message); } }
     try { require("./human2").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Manusia] " + e.message); }
+    try { require("./combat2").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Tempur] " + e.message); }
+    try { require("./builder").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Bangun] " + e.message); }
 
     addLog("[Modules] All modules initialized!");
   }
@@ -1887,7 +1883,7 @@ function makeBot(id, account, baseConfig) {
 
     addInterval(() => {
       if (!bot || !botState.connected) return;
-      if (botState.patrolActive) return;
+      if (botState.patrolActive || botState.fighting || botState.task) return;
       const now = Date.now();
       if (now - lastPathTime < 2000) return;
       lastPathTime = now;
@@ -1918,7 +1914,7 @@ function makeBot(id, account, baseConfig) {
         typeof bot.setControlState !== "function"
       )
         return;
-      if (botState.patrolActive) return;
+      if (botState.patrolActive || botState.fighting || botState.task) return;
       try {
         bot.setControlState("jump", true);
         setTimeout(() => {
@@ -1961,7 +1957,7 @@ function makeBot(id, account, baseConfig) {
         typeof bot.setControlState !== "function"
       )
         return;
-      if (botState.patrolActive) return;
+      if (botState.patrolActive || botState.fighting || botState.task) return;
       try {
         const entities = Object.values(bot.entities).filter(
           (e) =>

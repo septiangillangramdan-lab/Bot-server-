@@ -11,14 +11,35 @@ const HURT = /lava|fire|magma|cactus|sweet_berry|campfire|powder_snow|wither_ros
 const FALLING = /sand|gravel|concrete_powder|anvil|dragon_egg/;
 const TALL = /fence|_wall$/; // pagar & tembok 1,5 blok: tidak bisa dilompati
 
-function applyMovements(m, registry, dig) {
+const AVOID = /^(lava|fire|soul_fire|magma_block|cactus|sweet_berry_bush|powder_snow|campfire|soul_campfire|wither_rose|cobweb)$/;
+const SCAFFOLD = /^(dirt|cobblestone|stone|netherrack|cobbled_deepslate|andesite|diorite|granite|tuff|deepslate|[a-z_]+_planks)$/;
+
+function fromConfig(cfg) {
+  const h = (cfg && cfg.movement && cfg.movement.human) || {};
+  return { dig: h.dig !== false, place: h.build !== false };
+}
+
+// dig: boleh menghancurkan penghalang; place: boleh menaruh blok untuk naik / menyeberang
+function applyMovements(m, registry, dig, place) {
+  if (place === undefined) place = dig;
   m.canDig = !!dig;
   m.allowSprinting = true;
+  m.liquidCost = 2; // lebih suka jalan di darat, tapi tetap bisa berenang bila perlu
+  try {
+    if (!m.blocksToAvoid) m.blocksToAvoid = new Set();
+    for (const b of (registry && registry.blocksArray) || []) if (AVOID.test(b.name)) m.blocksToAvoid.add(b.id); // hindari lava, api, kaktus, dll
+  } catch (e) {}
   if (dig) {
     m.digCost = 4; // lebih suka melompat / memutar daripada menggali
     try {
       if (!m.blocksCantBreak) m.blocksCantBreak = new Set();
       for (const b of (registry && registry.blocksArray) || []) if (PROTECTED.test(b.name)) m.blocksCantBreak.add(b.id);
+    } catch (e) {}
+  }
+  m.allow1by1towers = !!place; // naik dengan menaruh blok di bawah kaki (bila ada blok di tas)
+  if (place) {
+    try {
+      m.scafoldingBlocks = ((registry && registry.itemsArray) || []).filter((i) => SCAFFOLD.test(i.name)).map((i) => i.id);
     } catch (e) {}
   }
   return m;
@@ -95,7 +116,7 @@ function walk(bot, botState, log, dig, opts) {
   const iv = setInterval(async () => {
     if (busy || done) return;
     try {
-      if (!bot.entity || !botState.connected || botState.patrolActive || Date.now() > until || turns > 4) return stop();
+      if (!bot.entity || !botState.connected || botState.patrolActive || botState.fighting || botState.task || Date.now() > until || turns > 4) return stop();
       const now = Date.now(), pos = bot.entity.position;
       const pr = probe(bot, yaw);
       if (pr.kind === "step") {
@@ -130,4 +151,4 @@ function walk(bot, botState, log, dig, opts) {
   }, 120);
 }
 
-module.exports = { applyMovements, walk, probe, breakable, PROTECTED };
+module.exports = { applyMovements, fromConfig, walk, probe, breakable, PROTECTED };
