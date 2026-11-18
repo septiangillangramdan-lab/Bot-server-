@@ -48,7 +48,7 @@ function command(cmd, targets) {
     const bot = b.bot;
     if (!bot || !b.botState.connected || !bot.pathfinder) return `[${b.name}] belum terhubung`;
     try {
-      bot.pathfinder.setMovements(new Movements(bot));
+      { const hm = (require("./settings.json").movement || {}).human; bot.pathfinder.setMovements(require("./human").applyMovements(new Movements(bot), bot.registry, !hm || hm.dig !== false)); }
       if (c === "/stop") { bot.pathfinder.setGoal(null); return `[${b.name}] berhenti`; }
       if (c === "/goto") {
         const [x, y, z] = a.map(Number);
@@ -186,8 +186,11 @@ function attach(bot, mcData, move, log, addInterval, config, state) {
         low.includes(String(x.match).replace(/{bot}/g, bot.username).toLowerCase())));
       if (!r) return;
       last[user] = Date.now();
-      const text = String(r.reply).replace(/{player}/g, user).replace(/{bot}/g, bot.username);
-      setTimeout(() => { if (up()) bot.chat(dm ? `/msg ${user} ${text}` : text); }, 1500 + Math.random() * 1500);
+      // "halo | hai {player}" = beberapa variasi, dipilih acak (tidak sama dengan sebelumnya)
+      const text = require("./human2").pickVariant(r.reply, r.match + ":" + bot.username).replace(/{player}/g, user).replace(/{bot}/g, bot.username);
+      const out = dm ? `/msg ${user} ${text}` : text;
+      if (state.say) state.say(out, { dedupe: true });
+      else setTimeout(() => { if (up()) bot.chat(out); }, 1500 + Math.random() * 1500);
     };
     bot.on("chat", (u, m) => react(u, m, false));
     bot.on("whisper", (u, m) => react(u, m, true));

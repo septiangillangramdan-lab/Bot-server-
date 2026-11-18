@@ -55,6 +55,11 @@
     "random-jump": {
       "enabled": true,
       "interval": 10000
+    },
+    "human": {
+      "enabled": true,
+      "dig": true,
+      "natural": true
     }
   },
   "modules": {
@@ -83,5 +88,25 @@
   },
   "chat": {
     "respond": true
+  },
+  "autonomy": {
+    "enabled": true,
+    "auto": true,
+    "owners": [],
+    "combat": {
+      "mobs": true,
+      "players": "defend",
+      "flee-health": 6
+    },
+    "build": {
+      "auto": true,
+      "size": 5,
+      "material": "auto",
+      "door": true
+    },
+    "progress": {
+      "enabled": true,
+      "max-tier": "iron"
+    }
   }
 }

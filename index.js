@@ -6,6 +6,10 @@ const mineflayer = require("mineflayer");
 const { Movements, pathfinder, goals } = require("mineflayer-pathfinder");
 const { GoalBlock } = goals;
 const config = require("./settings.json");
+// Mode manusia: lompati rintangan, hindari lubang, hancurkan blok penghalang (bisa dimatikan di Pengaturan)
+config.movement = config.movement || {};
+if (!config.movement.human) config.movement.human = { enabled: true, dig: true, natural: true };
+const naturalOn = () => { const h = config.movement.human; return !h || (h.enabled !== false && h.natural !== false); };
 const express = require("express");
 const http = require("http");
 const https = require("https");
@@ -1179,11 +1183,15 @@ app.post("/command", (req, res) => {
     const lines = [
       "/help  /pos  /status  /list  /say <msg>",
       "/goto x y z  /follow <player>  /come <player>  /stop",
+      "Mode manusia: /auto on|off  /build [ukuran]  /collect <item> [n]  /craft <item> [n]  /kill <pemain|mob>  /pillar [n]  /cancel  /autostatus",
       "/<anything> = Minecraft command, plain text = chat",
     ];
     lines.forEach((l) => addLog(`[Console] ${l}`));
     return res.json({ success: true, msg: lines.join("\n") });
   }
+
+  const au = require("./autonomy").command(cmd, targets);
+  if (au) { au.forEach((l) => addLog(`[Console] ${l}`)); return res.json({ success: true, msg: au.join("\n") }); }
 
   const mv = require("./extras").command(cmd, targets);
   if (mv) { mv.forEach((l) => addLog(`[Console] ${l}`)); return res.json({ success: true, msg: mv.join("\n") }); }
@@ -1291,7 +1299,7 @@ function makeBot(id, account, baseConfig) {
   const config = Object.assign({}, baseConfig, {
     "bot-account": Object.assign({}, baseConfig["bot-account"], account),
   });
-  if (baseConfig.modules && baseConfig.modules.survival) {
+  if ((baseConfig.modules && baseConfig.modules.survival) || (baseConfig.autonomy && baseConfig.autonomy.enabled)) {
     // survival replaces random walking / blind combat, which would fight over the pathfinder
     config.movement = Object.assign({}, baseConfig.movement, { enabled: false });
     config.position = Object.assign({}, baseConfig.position, { enabled: false });
@@ -1469,6 +1477,7 @@ function makeBot(id, account, baseConfig) {
         defaultMove.canDig = false;
         defaultMove.liquidCost = 1000;
         defaultMove.fallDamageCost = 1000;
+        require("./human").applyMovements(defaultMove, mcData, config.movement.human.dig !== false);
 
         initializeModules(bot, mcData, defaultMove);
 
@@ -1676,7 +1685,7 @@ function makeBot(id, account, baseConfig) {
         let i = 0;
         addInterval(() => {
           if (bot && botState.connected) {
-            bot.chat(messages[i]);
+            botState.say ? botState.say(messages[i]) : bot.chat(messages[i]);
             botState.lastActivity = Date.now();
             i = (i + 1) % messages.length;
           }
@@ -1684,7 +1693,7 @@ function makeBot(id, account, baseConfig) {
       } else {
         messages.forEach((msg, idx) => {
           setTimeout(() => {
-            if (bot && botState.connected) bot.chat(msg);
+            if (bot && botState.connected) botState.say ? botState.say(msg) : bot.chat(msg);
           }, idx * 1000);
         });
       }
@@ -1781,6 +1790,12 @@ function makeBot(id, account, baseConfig) {
               return;
             try {
               if (botState.patrolActive) return;
+              const hum = config.movement && config.movement.human;
+              if (!hum || hum.enabled !== false) {
+                require("./human").walk(bot, botState, addLog, !hum || hum.dig !== false);
+                botState.lastActivity = Date.now();
+                return;
+              }
               const yaw = Math.random() * Math.PI * 2;
               bot.look(yaw, 0, true);
               bot.setControlState("forward", true);
@@ -1831,7 +1846,8 @@ function makeBot(id, account, baseConfig) {
       }
       if (
         config.movement["look-around"] &&
-        config.movement["look-around"].enabled
+        config.movement["look-around"].enabled &&
+        !naturalOn() // mode manusia v2 punya gerak kepala yang halus sendiri
       ) {
         startLookAround(bot);
       }
@@ -1851,9 +1867,12 @@ function makeBot(id, account, baseConfig) {
     if (config.modules.chat) {
       chatModule(bot);
     }
-    if (config.modules.survival) require("./survival")(bot, mcData, defaultMove, addLog, addInterval, botState);
+    const autoOn = !!(config.autonomy && config.autonomy.enabled);
+    if (config.modules.survival && !autoOn) require("./survival")(bot, mcData, defaultMove, addLog, addInterval, botState);
     try { require("./extras").attach(bot, mcData, defaultMove, addLog, addInterval, config, botState); } catch (e) { addLog("[Extras] " + e.message); }
     try { require("./patrol").attach(bot, addLog, addInterval, botState); } catch (e) { addLog("[Patroli] " + e.message); }
+    if (autoOn) { try { require("./autonomy").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Auto] " + e.message); } }
+    try { require("./human2").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Manusia] " + e.message); }
 
     addLog("[Modules] All modules initialized!");
   }
@@ -2101,8 +2120,14 @@ function makeBot(id, account, baseConfig) {
 
         if (config.chat && config.chat.respond) {
           const lowerMsg = message.toLowerCase();
-          if (lowerMsg.includes("hello") || lowerMsg.includes("hi")) {
-            bot.chat(`Hello, ${username}!`);
+          if (/\b(hello|hi|hey|halo|hai)\b/.test(lowerMsg)) {
+            const key = "hello:" + username, now = Date.now();
+            if (!global.__helloAt) global.__helloAt = {};
+            if (now - (global.__helloAt[key] || 0) > 30000) {
+              global.__helloAt[key] = now;
+              const hi = require("./human2").pickVariant(`Hello, ${username}! | Hi ${username} | Hey ${username}`, key);
+              botState.say ? botState.say(hi, { dedupe: false }) : bot.chat(hi);
+            }
           }
           if (message.startsWith("!tp ")) {
             const target = message.split(" ")[1];

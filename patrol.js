@@ -7,6 +7,7 @@ const path = require("path");
 const { goals, Movements } = require("mineflayer-pathfinder");
 const { GoalNear, GoalXZ } = goals;
 const extras = require("./extras");
+const human = require("./human");
 
 const FILE = path.join(process.env.DATA_DIR || __dirname, "patrol.json");
 const MAX_LOG = 3000;
@@ -32,7 +33,7 @@ const save = () => {
 const flush = setInterval(() => { if (dirty) save(); }, 10000);
 if (flush.unref) flush.unref();
 
-const ctx = { manager: null };
+const ctx = { manager: null, config: null };
 const status = { t: 0, bot: "", msg: "", inside: [], wp: 0, wpTotal: 0, holes: 0 };
 
 const lower = (s) => String(s || "").toLowerCase();
@@ -88,11 +89,10 @@ function attach(bot, log, addInterval, botState) {
   const isStandable = (b) => b && b.boundingBox === "block" && !DANGER.test(b.name);
 
   function movements() {
-    const m = new Movements(bot);
-    m.canDig = false;
+    const hm = (ctx.config && ctx.config.movement && ctx.config.movement.human) || {};
+    const m = human.applyMovements(new Movements(bot), bot.registry, hm.dig !== false); // lompat 1 blok & hancurkan penghalang
     m.allow1by1towers = false;
     m.allowParkour = false;
-    m.allowSprinting = false;
     m.maxDropDown = 2;
     m.scafoldingBlocks = [];
     return m;
@@ -279,6 +279,7 @@ function attach(bot, log, addInterval, botState) {
 // ---------- API untuk panel ----------
 function routes(app, manager, config, addLog) {
   ctx.manager = manager;
+  ctx.config = config;
   const num = (v) => (v === "" || v == null || !Number.isFinite(Number(v)) ? null : Math.floor(Number(v)));
   const point = (o) => {
     if (o === null) return null;
