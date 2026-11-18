@@ -641,7 +641,23 @@ dialog{background:var(--panel);border-radius:22px}
 </section>
 
 <section id="t-patrol" class="tab">
-  <div class="chips" id="pt-seg"><button class="btn sm on" data-seg="patrol">Patroli</button><button class="btn sm" data-seg="build">Bangun</button></div>
+  <div class="chips" id="pt-seg"><button class="btn sm on" data-seg="patrol">Patroli</button><button class="btn sm" data-seg="build">Bangun</button><button class="btn sm" data-seg="ai">AI</button></div>
+  <div id="pt-ai" hidden>
+    <div class="panel">
+      <h2>Agen AI</h2>
+      <p class="mu" id="ag-key">Memuat…</p>
+      <label class="sw"><span>Aktifkan agen AI</span><input type="checkbox" id="ag-on"></label>
+      <label style="margin-top:12px">Tujuan (opsional)</label>
+      <textarea id="ag-goal" rows="2" maxlength="300" placeholder="kosong = bertahan hidup, bangun rumah, mining, buat perlengkapan besi"></textarea>
+      <label>Bot</label><select id="ag-bot"></select>
+      <p class="mu" style="margin-top:12px" id="ag-st">—</p>
+      <p class="mu" id="ag-budget"></p>
+      <p class="mu">Bot memutuskan sendiri apa yang dikerjakan lewat AI, lalu mencatat pelajarannya. Setiap keputusan memakai kuota API. Agen berhenti otomatis kalau bot mati 3 kali dalam 15 menit.</p>
+    </div>
+    <div class="panel"><h2>Pikiran terakhir</h2><div id="ag-th"><p class="mu">—</p></div></div>
+    <div class="panel"><h2>Yang sudah dipelajari</h2><div id="ag-notes"><p class="mu">—</p></div><div id="ag-places" class="mu"></div><button class="btn stop sm" id="ag-forget" style="margin-top:12px">Lupakan semua</button></div>
+    <div class="panel"><h2>Riwayat aksi</h2><div id="ag-hist"><p class="mu">—</p></div></div>
+  </div>
   <div id="pt-build" hidden>
     <div class="panel">
       <h2>Bangun otonom</h2>
@@ -1334,8 +1350,9 @@ async function bdLoad(){
 $$('#pt-seg [data-seg]').forEach(b=>b.onclick=()=>{
   BD.seg=b.dataset.seg;
   $$('#pt-seg [data-seg]').forEach(x=>x.classList.toggle('on',x===b));
-  $('#pt-patrol').hidden=BD.seg!=='patrol';$('#pt-build').hidden=BD.seg!=='build';
+  $('#pt-patrol').hidden=BD.seg!=='patrol';$('#pt-build').hidden=BD.seg!=='build';$('#pt-ai').hidden=BD.seg!=='ai';
   if(BD.seg==='build')bdLoad();
+  if(BD.seg==='ai')agLoad();
 });
 $('#bd-start').onclick=async()=>{
   const goal=$('#bd-goal').value.trim();
@@ -1344,6 +1361,36 @@ $('#bd-start').onclick=async()=>{
 };
 $('#bd-stop').onclick=async()=>{res(await call('/api/build/stop',{}),'Menghentikan proyek');bdLoad()};
 setInterval(()=>{if(tab==='patrol'&&BD.seg==='build'&&!document.hidden)bdLoad()},3000);
+
+
+/* ---------- agen AI ---------- */
+async function agLoad(){
+  const d=await call('/api/agent');if(!d||!d.success)return;
+  $('#ag-key').textContent=d.hasKey?'Kunci API terpasang.':'Kunci API belum diisi (ANTHROPIC_API_KEY atau OPENAI_API_KEY di Railway → Variables).';
+  const sel=$('#ag-bot'),cur=sel.value;
+  sel.innerHTML=d.bots.map(b=>'<option value="'+esc(b.id)+'">'+esc(b.id)+(b.online?'':' (offline)')+'</option>').join('');
+  sel.value=cur||d.bot||sel.value;
+  if(!AG.typing&&document.activeElement!==$('#ag-goal'))$('#ag-goal').value=d.objective||$('#ag-goal').value;
+  $('#ag-on').checked=!!d.running;
+  $('#ag-st').textContent=d.status+(d.busy?' · '+d.busy:'');
+  $('#ag-budget').textContent='Keputusan hari ini: '+d.calls+' / '+d.limit+' · total '+d.decisions;
+  $('#ag-th').innerHTML=d.thought||d.action?'<div class="li">'+esc(d.thought||'')+'<div class="mu">'+esc(d.action||'')+'</div></div>':'<p class="mu">—</p>';
+  $('#ag-notes').innerHTML=d.notes.length?d.notes.slice().reverse().map(n=>'<div class="li">'+esc(n)+'</div>').join(''):'<p class="mu">Belum ada.</p>';
+  const pl=Object.entries(d.places||{});
+  $('#ag-places').innerHTML=pl.length?'Tempat tersimpan: '+pl.map(([k,v])=>esc(k)+' ('+v.x+', '+v.y+', '+v.z+')').join(' · '):'';
+  $('#ag-hist').innerHTML=d.history.length?d.history.map(h=>'<div class="li"><b>'+esc(h.a)+'</b><div class="mu">'+esc(h.r)+'</div></div>').join(''):'<p class="mu">—</p>';
+}
+const AG={typing:false};
+$('#ag-goal').oninput=()=>{AG.typing=true;clearTimeout(AG.t);AG.t=setTimeout(()=>AG.typing=false,8000)};
+$('#ag-on').onchange=async e=>{
+  const on=e.target.checked;
+  const d=on?await call('/api/agent/start',{bot:$('#ag-bot').value,objective:$('#ag-goal').value}):await call('/api/agent/stop',{});
+  res(d,on?'Agen AI dijalankan':'Agen AI dihentikan');
+  if(!d||!d.success)e.target.checked=!on;
+  agLoad();
+};
+$('#ag-forget').onclick=async()=>{if(!await ask({title:'Lupakan semua?',text:'Catatan pelajaran, tempat tersimpan, dan riwayat akan dihapus.',ok:'Hapus',danger:true}))return;res(await call('/api/agent/forget',{}),'Memori agen dihapus');agLoad()};
+setInterval(()=>{if(tab==='patrol'&&BD.seg==='ai'&&!document.hidden)agLoad()},4000);
 
 addEventListener('hashchange',()=>{const t=location.hash.slice(1);if(t!==tab&&$('#t-'+t))go(t)});
 if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
