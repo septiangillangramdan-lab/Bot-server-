@@ -1869,6 +1869,7 @@ function makeBot(id, account, baseConfig) {
     try { require("./human2").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Manusia] " + e.message); }
     try { require("./combat2").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Tempur] " + e.message); }
     try { require("./builder").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Bangun] " + e.message); }
+    try { require("./agent").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Agen] " + e.message); }
 
     addLog("[Modules] All modules initialized!");
   }

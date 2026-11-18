@@ -178,6 +178,7 @@ function attach(bot, mcData, botState, config, log, addInterval) {
   const Vec3 = bot.entity.position.constructor;
   const S = { running: false, abort: false, phase: "Menganggur", msg: "", done: 0, total: 0, plan: null, need: [], origin: null, error: "", lines: [], startedAt: 0 };
   botState.build = S;
+  botState.skills = {}; // diisi di akhir attach: fungsi yang dipakai bersama modul agen
   const say = (m) => { S.msg = m; S.lines.push(new Date().toLocaleTimeString("id-ID") + " " + m); if (S.lines.length > 40) S.lines.shift(); log("[Bangun] " + m); };
   const up = () => botState.connected && bot.entity && !S.abort;
   const inv = () => { const c = {}; bot.inventory.items().forEach((i) => (c[i.name] = (c[i.name] || 0) + i.count)); return c; };
@@ -185,10 +186,10 @@ function attach(bot, mcData, botState, config, log, addInterval) {
   const items = () => bot.inventory.items();
   const stopCheck = async () => { while (botState.fighting && up()) await sleep(500); if (!up()) throw new Error("dihentikan"); };
   const moveCfg = () => { const m = human.applyMovements(new Movements(bot), registry, false, false); m.allowParkour = false; return m; };
-  async function go(goal, tries) {
+  async function go(goal, tries, mv) {
     for (let i = 0; i < (tries || 2); i++) {
       await stopCheck();
-      try { bot.pathfinder.setMovements(moveCfg()); await bot.pathfinder.goto(goal); return true; } catch (e) { if (S.abort) throw new Error("dihentikan"); await sleep(400); }
+      try { bot.pathfinder.setMovements((mv || moveCfg)()); await bot.pathfinder.goto(goal); return true; } catch (e) { if (S.abort) throw new Error("dihentikan"); await sleep(400); }
     }
     return false;
   }
@@ -251,7 +252,7 @@ function attach(bot, mcData, botState, config, log, addInterval) {
     let got = 0, fails = 0;
     const bad = new Set();
     const ids = names.map((n) => registry.blocksByName[n] && registry.blocksByName[n].id).filter((x) => x != null);
-    const before = () => count(itemName);
+    const before = () => (typeof itemName === "function" ? itemName() : count(itemName));
     const start = before();
     while (up() && before() - start < wantCount && fails < 10 && Date.now() < deadline) {
       await stopCheck();
@@ -266,7 +267,7 @@ function attach(bot, mcData, botState, config, log, addInterval) {
         await bot.dig(bot.blockAt(t.position), true);
         await sleep(250); await pickup();
       } catch (e) { bad.add(t.position.toString()); fails++; }
-      S.msg = `Mengumpulkan ${itemName} (${before() - start}/${wantCount})`;
+      S.msg = `Mengumpulkan ${typeof itemName === "function" ? "bahan" : itemName} (${before() - start}/${wantCount})`;
     }
     return before() - start >= wantCount;
   }
@@ -317,6 +318,220 @@ function attach(bot, mcData, botState, config, log, addInterval) {
       return "ok";
     } catch (e) { return "error"; }
   }
+
+
+  // ================= keterampilan tambahan untuk agen AI =================
+  const MIN_Y = -48; // jangan menggali lebih dalam dari ini (hindari danau lava)
+  const TIER_ORDER = ["wooden", "stone", "iron", "diamond"];
+  const ORES = {
+    coal: { blocks: ["coal_ore", "deepslate_coal_ore"], item: "coal", tier: "wooden" },
+    iron: { blocks: ["iron_ore", "deepslate_iron_ore"], item: "raw_iron", tier: "stone" },
+    copper: { blocks: ["copper_ore", "deepslate_copper_ore"], item: "raw_copper", tier: "stone" },
+    gold: { blocks: ["gold_ore", "deepslate_gold_ore"], item: "raw_gold", tier: "iron" },
+    redstone: { blocks: ["redstone_ore", "deepslate_redstone_ore"], item: "redstone", tier: "iron" },
+    lapis: { blocks: ["lapis_ore", "deepslate_lapis_ore"], item: "lapis_lazuli", tier: "stone" },
+    diamond: { blocks: ["diamond_ore", "deepslate_diamond_ore"], item: "diamond", tier: "iron" },
+  };
+  const SMELT = { raw_iron: "iron_ingot", raw_gold: "gold_ingot", raw_copper: "copper_ingot", cobblestone: "stone", raw_beef: "cooked_beef", raw_porkchop: "cooked_porkchop", raw_chicken: "cooked_chicken", raw_mutton: "cooked_mutton", raw_cod: "cooked_cod", raw_salmon: "cooked_salmon", potato: "baked_potato" };
+  const digCfg = () => { const m = human.applyMovements(new Movements(bot), registry, true, false); m.allowParkour = false; return m; };
+  const logNames = () => registry.blocksArray.filter((b) => /_log$/.test(b.name)).map((b) => b.name);
+  const totalOf = (re) => items().filter((i) => re.test(i.name)).reduce((s, i) => s + i.count, 0);
+  const tierIdx = (n) => TIER_ORDER.indexOf(n);
+  const bestPickTier = () => Math.max(-1, ...items().filter((i) => /_pickaxe$/.test(i.name)).map((i) => tierIdx(i.name.replace("_pickaxe", ""))));
+  const R = (ok, msg) => ({ ok: !!ok, msg });
+
+  async function gatherWood(n) {
+    const got = await mineKind(logNames(), n, () => totalOf(/_log$/), Date.now() + 8 * 60000);
+    return R(got, got ? `dapat ${n} kayu` : `kayu terkumpul ${totalOf(/_log$/)} (pohon sulit dijangkau atau jauh)`);
+  }
+  async function mineStone(n) {
+    if (!(await ensureTool("pickaxe"))) return R(false, "tidak bisa membuat pickaxe (kayu kurang)");
+    const before = count("cobblestone");
+    await mineKind(MINE_FROM.cobblestone, n, "cobblestone", Date.now() + 8 * 60000);
+    const d = count("cobblestone") - before;
+    return R(d >= n, `cobblestone +${d}`);
+  }
+  async function mineOre(key, n) {
+    const o = ORES[key];
+    if (!o) return R(false, "ore tidak dikenal");
+    if (bestPickTier() < tierIdx(o.tier)) return R(false, `butuh pickaxe ${o.tier} atau lebih baik untuk ${key}`);
+    const ids = o.blocks.map((b) => registry.blocksByName[b] && registry.blocksByName[b].id).filter((x) => x != null);
+    if (!ids.length) return R(false, "ore tidak ada di versi ini");
+    const startCount = count(o.item), deadline = Date.now() + 7 * 60000;
+    const bad = new Set();
+    let fails = 0;
+    while (up() && count(o.item) - startCount < n && fails < 6 && Date.now() < deadline) {
+      await stopCheck();
+      const cand = bot.findBlocks({ matching: ids, maxDistance: 64, count: 12 }).filter((p) => p.y >= MIN_Y && !bad.has(p.toString()));
+      if (!cand.length) return R(count(o.item) > startCount, `${key} tidak terlihat dalam 64 blok (dapat ${count(o.item) - startCount})`);
+      cand.sort((a, b) => a.distanceTo(bot.entity.position) - b.distanceTo(bot.entity.position));
+      const p = cand[0], blk = bot.blockAt(p);
+      // jangan gali bila ada lava di sekitar ore
+      const lava = FACES.some((f) => { const nb = bot.blockAt(p.offset(...f)); return nb && /lava/.test(nb.name); });
+      if (!blk || lava) { bad.add(p.toString()); continue; }
+      if (!(await go(new GoalLookAtBlock(p, bot.world, { reach: 4 }), 2, digCfg))) { bad.add(p.toString()); fails++; continue; }
+      try {
+        const tool = bot.pathfinder.bestHarvestTool ? bot.pathfinder.bestHarvestTool(bot.blockAt(p)) : null;
+        if (tool) await bot.equip(tool, "hand");
+        await bot.dig(bot.blockAt(p), true); await sleep(250); await pickup();
+      } catch (e) { bad.add(p.toString()); fails++; }
+    }
+    const d = count(o.item) - startCount;
+    return R(d >= n, `${o.item} +${d}`);
+  }
+  // turun lewat tangga miring (bisa dipanjat lagi), berhenti bila ada lava/air di depan
+  async function digDown(toY) {
+    toY = Math.max(MIN_Y, Math.floor(toY));
+    const dirs = [[1, 0], [0, 1], [-1, 0], [0, -1]];
+    let [dx, dz] = dirs[Math.floor(Math.random() * 4)], steps = 0;
+    while (up() && Math.floor(bot.entity.position.y) > toY && steps < 80) {
+      await stopCheck();
+      const p = bot.entity.position.floored(), nx = p.x + dx, nz = p.z + dz, ny = p.y - 1;
+      const need = [new Vec3(nx, ny + 1, nz), new Vec3(nx, ny, nz)];
+      const below = bot.blockAt(new Vec3(nx, ny - 1, nz));
+      const around = [].concat(need, [new Vec3(nx, ny - 1, nz), new Vec3(nx, ny + 2, nz)]).map((q) => bot.blockAt(q));
+      if (around.some((b) => b && /lava|water/.test(b.name)) || (below && /lava|water/.test(below.name)) || !below || below.boundingBox !== "block") { [dx, dz] = dirs[Math.floor(Math.random() * 4)]; steps += 3; continue; }
+      for (const q of need) { const b = bot.blockAt(q); if (b && !AIR.test(b.name)) { if (!human.breakable(bot, b)) { [dx, dz] = dirs[Math.floor(Math.random() * 4)]; steps += 3; break; } const tool = bot.pathfinder.bestHarvestTool ? bot.pathfinder.bestHarvestTool(b) : null; try { if (tool) await bot.equip(tool, "hand"); await bot.dig(b, true); } catch (e) { return R(false, "gagal menggali"); } } }
+      if (!(await go(new GoalNear(nx + 0.5, ny, nz + 0.5, 0.6), 2))) { steps += 2; continue; }
+      steps++;
+    }
+    const y = Math.floor(bot.entity.position.y);
+    return R(y <= toY + 1, `sekarang di y=${y}`);
+  }
+  async function tunnel(dir, len) {
+    const v = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] }[dir];
+    if (!v) return R(false, "arah tidak dikenal");
+    const p0 = bot.entity.position.floored();
+    let done = 0;
+    for (let i = 1; i <= len && up(); i++) {
+      await stopCheck();
+      const nx = p0.x + v[0] * i, nz = p0.z + v[1] * i, y = p0.y;
+      const cells = [new Vec3(nx, y, nz), new Vec3(nx, y + 1, nz)];
+      const near = cells.concat([new Vec3(nx, y + 2, nz), new Vec3(nx, y - 1, nz)]).map((q) => bot.blockAt(q));
+      const floorB = bot.blockAt(new Vec3(nx, y - 1, nz));
+      if (near.some((b) => b && /lava|water/.test(b.name)) || !floorB || floorB.boundingBox !== "block") break;
+      let blocked = false;
+      for (const q of cells) { const b = bot.blockAt(q); if (b && !AIR.test(b.name)) { if (!human.breakable(bot, b)) { blocked = true; break; } try { const tool = bot.pathfinder.bestHarvestTool ? bot.pathfinder.bestHarvestTool(b) : null; if (tool) await bot.equip(tool, "hand"); await bot.dig(b, true); } catch (e) { blocked = true; break; } } }
+      if (blocked) break;
+      await go(new GoalNear(nx + 0.5, y, nz + 0.5, 0.6), 1);
+      done = i;
+    }
+    await pickup();
+    return R(done > 0, `terowong ${done} blok ke ${dir}`);
+  }
+  async function placeNear(itemName) {
+    const feet = bot.entity.position.floored();
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ref = bot.blockAt(feet.offset(dx, -1, dz)), above = bot.blockAt(feet.offset(dx, 0, dz));
+      if (solid(ref) && above && AIR.test(above.name)) { try { await bot.equip(items().find((i) => i.name === itemName), "hand"); await bot.placeBlock(ref, new Vec3(0, 1, 0)); return true; } catch (e) {} }
+    }
+    return false;
+  }
+  async function ensureFurnace() {
+    const id = registry.blocksByName.furnace.id;
+    let f = bot.findBlock({ matching: id, maxDistance: 32 });
+    if (!f) {
+      if (!count("furnace")) { if (!(await acquire("furnace", 1))) return null; }
+      await placeNear("furnace");
+      f = bot.findBlock({ matching: id, maxDistance: 8 });
+    }
+    if (!f) return null;
+    await go(new GoalNear(f.position.x, f.position.y, f.position.z, 2.5));
+    return bot.blockAt(f.position);
+  }
+  async function smelt(raw, n) {
+    const out = SMELT[raw];
+    if (!out) return R(false, "item tidak bisa dilebur");
+    n = Math.min(n, count(raw));
+    if (n <= 0) return R(false, `tidak punya ${raw}`);
+    const block = await ensureFurnace();
+    if (!block) return R(false, "tidak punya tungku (butuh 8 cobblestone dan crafting table)");
+    const fuel = items().filter((i) => i.name !== raw && /^(coal|charcoal)$/.test(i.name))[0] || items().filter((i) => i.name !== raw && /_(planks|log)$/.test(i.name))[0];
+    if (!fuel) return R(false, "tidak ada bahan bakar (coal, kayu, atau planks)");
+    const fuelNeed = /^(coal|charcoal)$/.test(fuel.name) ? Math.ceil(n / 8) : Math.ceil(n / 1.5);
+    if (fuel.count < fuelNeed && /^(coal|charcoal)$/.test(fuel.name) === false) return R(false, `bahan bakar kurang (butuh ${fuelNeed} ${fuel.name})`);
+    let furnace;
+    try {
+      furnace = await bot.openFurnace(block);
+      await furnace.putFuel(fuel.type, null, Math.min(fuel.count, fuelNeed));
+      await furnace.putInput(registry.itemsByName[raw].id, null, n);
+      const deadline = Date.now() + n * 11000 + 8000;
+      let got = 0;
+      while (up() && Date.now() < deadline && got < n) {
+        await sleep(2000);
+        if (furnace.outputItem()) { const o = await furnace.takeOutput(); got += (o && o.count) || 0; }
+      }
+      furnace.close();
+      return R(got >= n, `${out} +${got}`);
+    } catch (e) { try { furnace && furnace.close(); } catch (er) {} return R(false, "gagal melebur: " + e.message); }
+  }
+  async function craftAny(name, n) {
+    const it = registry.itemsByName[name];
+    if (!it) return R(false, "item tidak dikenal");
+    if (/_planks$/.test(name)) { const ok = await planksFor(Math.max(count(name), 0) + n); return R(ok || count(name) >= n, `planks ${count(name)}`); }
+    let table = null;
+    if (!bot.recipesFor(it.id, null, 1, null)[0]) { table = await ensureTable(); if (!table) return R(false, "tidak ada crafting table"); }
+    const ok = await craft(name, n, table);
+    return R(ok, ok ? `membuat ${n} ${name}` : `bahan untuk ${name} kurang`);
+  }
+  async function makeTools(tier) {
+    const mat = { wooden: null, stone: "cobblestone", iron: "iron_ingot", diamond: "diamond" }[tier];
+    if (mat === undefined) return R(false, "tier tidak dikenal");
+    if (tierIdx(tier) > 0 && bestPickTier() < tierIdx(tier) - 1 && !items().some((i) => i.name === `${TIER_ORDER[tierIdx(tier) - 1]}_pickaxe`)) { /* butuh tier sebelumnya untuk bahan; lanjut saja, bahan yang menentukan */ }
+    const made = [];
+    for (const kind of ["pickaxe", "axe", "sword"]) {
+      if (items().some((i) => i.name === `${tier}_${kind}`)) continue;
+      const cost = kind === "sword" ? 2 : 3;
+      if (tier === "wooden") { if (!(await planksFor(cost + 6))) return R(false, "kayu kurang untuk alat kayu"); }
+      else if (count(mat) < cost) { if (tier === "stone") { await acquire("cobblestone", cost); } if (count(mat) < cost) return R(false, `butuh ${cost} ${mat} untuk ${tier}_${kind} (punya ${count(mat)})`); }
+      if (totalOf(/^stick$/) < 2) { await planksFor(4); await craft("stick", 1); }
+      const table = await ensureTable();
+      if (!table) return R(false, "tidak ada crafting table");
+      if (await craft(`${tier}_${kind}`, 1, table)) made.push(`${tier}_${kind}`);
+    }
+    return R(made.length > 0 || ["pickaxe", "axe", "sword"].every((k) => items().some((i) => i.name === `${tier}_${k}`)), made.length ? "dibuat: " + made.join(", ") : "alat sudah lengkap");
+  }
+  const SLOT = { helmet: "head", chestplate: "torso", leggings: "legs", boots: "feet" };
+  async function equipArmor() {
+    const worn = [];
+    for (const [piece, dest] of Object.entries(SLOT)) {
+      const best = items().filter((i) => new RegExp(`_${piece}$`).test(i.name)).sort((a, b) => ["leather", "golden", "chainmail", "iron", "diamond", "netherite"].indexOf(b.name.split("_")[0]) - ["leather", "golden", "chainmail", "iron", "diamond", "netherite"].indexOf(a.name.split("_")[0]))[0];
+      if (best) { try { await bot.equip(best, dest); worn.push(best.name); } catch (e) {} }
+    }
+    return worn;
+  }
+  async function makeArmor(matName) {
+    const ingot = { iron: "iron_ingot", diamond: "diamond" }[matName];
+    if (!ingot) return R(false, "bahan armor tidak dikenal");
+    const cost = { chestplate: 8, leggings: 7, helmet: 5, boots: 4 };
+    const made = [];
+    for (const piece of ["chestplate", "leggings", "helmet", "boots"]) {
+      const nm = `${matName}_${piece}`;
+      if (items().some((i) => i.name === nm)) continue;
+      if (count(ingot) < cost[piece]) continue;
+      const table = await ensureTable();
+      if (!table) return R(false, "tidak ada crafting table");
+      if (await craft(nm, 1, table)) made.push(nm);
+    }
+    const worn = await equipArmor();
+    const need = Object.values(cost).reduce((a, b) => a + b, 0);
+    return R(made.length > 0 || worn.length > 0, made.length ? `dibuat: ${made.join(", ")}; dipakai ${worn.length} bagian` : `bahan kurang (butuh sampai ${need} ${ingot}, punya ${count(ingot)})`);
+  }
+  async function explore() {
+    const a = Math.random() * Math.PI * 2, d = 25 + Math.random() * 25;
+    const p = bot.entity.position, x = Math.floor(p.x + Math.cos(a) * d), z = Math.floor(p.z + Math.sin(a) * d);
+    const ok = await go(new goals.GoalXZ(x, z), 1);
+    const q = bot.entity.position;
+    return R(ok || q.distanceTo(p) > 10, `berpindah ke ${Math.floor(q.x)} ${Math.floor(q.y)} ${Math.floor(q.z)}`);
+  }
+  async function eatNow() {
+    const foods = registry.foods || {};
+    const bad = /rotten_flesh|spider_eye|poisonous_potato|pufferfish|chorus_fruit|suspicious_stew/;
+    const f = items().filter((i) => foods[i.type] && !bad.test(i.name)).sort((a, b) => foods[b.type].foodPoints - foods[a.type].foodPoints)[0];
+    if (!f) return R(false, "tidak ada makanan di tas");
+    try { await bot.equip(f, "hand"); await bot.consume(); return R(true, `makan ${f.name}`); } catch (e) { return R(false, "gagal makan: " + e.message); }
+  }
+  botState.skills = { gatherWood, mineStone, mineOre, digDown, tunnel, smelt, craftAny, makeTools, makeArmor, equipArmor, explore, eatNow, ORES, SMELT, MIN_Y, inv, items };
 
   async function run(goal) {
     try {
@@ -388,11 +603,12 @@ function attach(bot, mcData, botState, config, log, addInterval) {
     } catch (e) {
       S.error = e.message; S.phase = e.message === "dihentikan" ? "Dihentikan" : "Gagal"; say(`${S.phase}: ${e.message}`);
     } finally {
-      S.running = false; botState.task = false;
+      S.running = false; botState.task = !!botState.agentActive;
       try { bot.pathfinder.setGoal(null); } catch (e) {}
     }
   }
 
+  Object.assign(botState.skills, { go, craft, ensureTable, planksFor, ensureTool, mineKind, pickup, count, items, inv, stopCheck, moveCfg, solid, S });
   botState.buildStart = (goal) => {
     if (S.running) return "bot masih mengerjakan proyek sebelumnya";
     if (!botState.connected) return "bot belum terhubung";
@@ -424,4 +640,5 @@ function routes(app, manager, config, addLog) {
   });
 }
 
-module.exports = { attach, routes, _t: { withRetry, callOpenAI, provider, hasKey, modelName, parseBlueprint, resolveBlock, tally, findSite, mainWood, plannerPrompts, setLLM: (f) => { llm = f; }, LIMITS } };
+const ask = (system, user, onRetry) => withRetry(() => llm(system, user), onRetry);
+module.exports = { attach, routes, ask: (system, user) => llm(system, user), withRetry, ask, _t: { withRetry, callOpenAI, provider, hasKey, modelName, parseBlueprint, resolveBlock, tally, findSite, mainWood, plannerPrompts, setLLM: (f) => { llm = f; }, LIMITS } };

@@ -244,4 +244,5 @@ module.exports = function more(app, manager, config, addLog) {
   // ---------- patroli area (pemain & blok di dalam kotak koordinat) ----------
   try { require("./patrol").routes(app, manager, config, addLog); } catch (e) { addLog("[Patroli] rute gagal: " + e.message); }
   try { require("./builder").routes(app, manager, config, addLog); } catch (e) { addLog("[Bangun] rute gagal: " + e.message); }
+  try { require("./agent").routes(app, manager, config, addLog); } catch (e) { addLog("[Agen] rute gagal: " + e.message); }
 };
