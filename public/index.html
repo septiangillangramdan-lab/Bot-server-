@@ -641,7 +641,7 @@ dialog{background:var(--panel);border-radius:22px}
 </section>
 
 <section id="t-patrol" class="tab">
-  <div class="chips" id="pt-seg"><button class="btn sm on" data-seg="patrol">Patroli</button><button class="btn sm" data-seg="build">Bangun</button><button class="btn sm" data-seg="ai">AI</button></div>
+  <div class="chips" id="pt-seg"><button class="btn sm on" data-seg="patrol">Patroli</button><button class="btn sm" data-seg="build">Bangun</button><button class="btn sm" data-seg="ai">AI</button><button class="btn sm" data-seg="bp">Blueprint</button><button class="btn sm" data-seg="pvp">PvP</button></div>
   <div id="pt-ai" hidden>
     <div class="panel">
       <h2>Agen AI</h2>
@@ -657,6 +657,55 @@ dialog{background:var(--panel);border-radius:22px}
     <div class="panel"><h2>Pikiran terakhir</h2><div id="ag-th"><p class="mu">—</p></div></div>
     <div class="panel"><h2>Yang sudah dipelajari</h2><div id="ag-notes"><p class="mu">—</p></div><div id="ag-places" class="mu"></div><button class="btn stop sm" id="ag-forget" style="margin-top:12px">Lupakan semua</button></div>
     <div class="panel"><h2>Riwayat aksi</h2><div id="ag-hist"><p class="mu">—</p></div></div>
+  </div>
+  <div id="pt-bp" hidden>
+    <div class="panel">
+      <h2>Blueprint (hologram rumah)</h2>
+      <p class="mu">Unggah file <b>.litematic</b> (Litematica), <b>.schem</b> atau <b>.nbt</b>. Bot membangunnya blok demi blok, mengambil bahan dari peti/shulker, dan menambal bagian yang rusak.</p>
+      <label>Unggah file</label>
+      <input type="file" id="bp-up" accept=".litematic,.schem,.schematic,.nbt">
+      <button class="btn sm" id="bp-upgo" style="margin:8px 0 12px">Unggah</button>
+      <label>Blueprint</label><select id="bp-file"></select>
+      <label>Bot</label><select id="bp-bot"></select>
+      <label>Titik asal / pojok bangunan (x, y, z). Kosong = posisi bot sekarang</label>
+      <div class="g3"><input type="number" id="bp-x" inputmode="numeric" placeholder="x"><input type="number" id="bp-y" inputmode="numeric" placeholder="y"><input type="number" id="bp-z" inputmode="numeric" placeholder="z"></div>
+      <label style="margin-top:10px">Rotasi</label>
+      <select id="bp-rot"><option value="0">0°</option><option value="1">90°</option><option value="2">180°</option><option value="3">270°</option></select>
+      <div class="two" style="margin-top:12px"><button class="btn" id="bp-load">Muat</button><button class="btn go" id="bp-build">Bangun</button></div>
+      <div class="two" style="margin-top:10px"><button class="btn" id="bp-verify">Periksa</button><button class="btn" id="bp-repair">Tambal</button></div>
+      <div class="two" style="margin-top:10px"><button class="btn stop" id="bp-stop">Berhenti</button><button class="btn stop" id="bp-del">Hapus file</button></div>
+      <label class="sw" style="margin-top:12px"><span>Penjaga: tambal otomatis (bekas ledakan creeper dll)</span><input type="checkbox" id="bp-guard"></label>
+    </div>
+    <div class="panel"><h2>Status</h2><p class="mu" id="bp-st">Belum ada blueprint.</p><progress id="bp-bar" max="100" value="0" style="width:100%"></progress><div id="bp-info"></div></div>
+    <div class="panel"><h2>Pratinjau lapisan</h2>
+      <p class="mu" id="bp-lt">—</p>
+      <input type="range" id="bp-ly" min="0" max="0" value="0" style="width:100%">
+      <canvas id="bp-cv" width="320" height="320" style="max-width:100%;border-radius:10px;background:#0002"></canvas>
+      <div id="bp-lg" class="mu"></div>
+    </div>
+    <div class="panel"><h2>Bahan</h2><div id="bp-mat"><p class="mu">—</p></div></div>
+    <div class="panel">
+      <h2>Suplai & medan</h2>
+      <p class="mu">Peti/barrel/shulker di sekitar dipakai otomatis. Daftarkan peti khusus di sini, atau pindai semuanya agar isinya diingat. Potret area dipakai penjaga untuk menambal tanah yang hilang.</p>
+      <div class="g3"><input type="number" id="sp-x" inputmode="numeric" placeholder="x"><input type="number" id="sp-y" inputmode="numeric" placeholder="y"><input type="number" id="sp-z" inputmode="numeric" placeholder="z"></div>
+      <div class="two" style="margin-top:10px"><button class="btn sm" id="sp-add">Tambah peti</button><button class="btn sm" id="sp-scan">Pindai peti sekitar</button></div>
+      <div class="two" style="margin-top:10px"><input type="number" id="sn-r" value="8" min="2" max="14" inputmode="numeric"><button class="btn sm" id="sn-go">Potret area (radius)</button></div>
+    </div>
+    <div class="panel"><h2>Catatan printer</h2><div id="bp-log"><p class="mu">—</p></div></div>
+  </div>
+  <div id="pt-pvp" hidden>
+    <div class="panel">
+      <h2>PvP gaya HeroBot</h2>
+      <p class="mu" id="pv-st">Memuat…</p>
+      <label class="sw"><span>PvP aktif (membalas siapa pun yang memukul)</span><input type="checkbox" id="pv-on"></label>
+      <label class="sw"><span>Mode dendam (kejar pemain yang pernah membunuh / sering memukul)</span><input type="checkbox" id="pv-rev"></label>
+      <label style="margin-top:12px">Bot</label><select id="pv-bot"></select>
+      <label>Teman (tidak pernah diserang)</label>
+      <div class="two"><input type="text" id="pv-fr" placeholder="nama pemain"><button class="btn sm" id="pv-fadd">Tambah teman</button></div>
+      <p class="mu" id="pv-friends"></p>
+      <p class="mu">Teknik: critical hit, sprint-reset, strafe, perisai, totem, apel emas. Bot melawan dengan senjata apa pun yang ada (bahkan tangan kosong) sampai lawan kalah.</p>
+    </div>
+    <div class="panel"><h2>Daftar dendam</h2><div id="pv-list"><p class="mu">Belum ada catatan.</p></div></div>
   </div>
   <div id="pt-build" hidden>
     <div class="panel">
@@ -1350,9 +1399,11 @@ async function bdLoad(){
 $$('#pt-seg [data-seg]').forEach(b=>b.onclick=()=>{
   BD.seg=b.dataset.seg;
   $$('#pt-seg [data-seg]').forEach(x=>x.classList.toggle('on',x===b));
-  $('#pt-patrol').hidden=BD.seg!=='patrol';$('#pt-build').hidden=BD.seg!=='build';$('#pt-ai').hidden=BD.seg!=='ai';
+  $('#pt-patrol').hidden=BD.seg!=='patrol';$('#pt-build').hidden=BD.seg!=='build';$('#pt-ai').hidden=BD.seg!=='ai';$('#pt-bp').hidden=BD.seg!=='bp';$('#pt-pvp').hidden=BD.seg!=='pvp';
   if(BD.seg==='build')bdLoad();
   if(BD.seg==='ai')agLoad();
+  if(BD.seg==='bp')bpLoad();
+  if(BD.seg==='pvp')pvLoad();
 });
 $('#bd-start').onclick=async()=>{
   const goal=$('#bd-goal').value.trim();
@@ -1391,6 +1442,90 @@ $('#ag-on').onchange=async e=>{
 };
 $('#ag-forget').onclick=async()=>{if(!await ask({title:'Lupakan semua?',text:'Catatan pelajaran, tempat tersimpan, dan riwayat akan dihapus.',ok:'Hapus',danger:true}))return;res(await call('/api/agent/forget',{}),'Memori agen dihapus');agLoad()};
 setInterval(()=>{if(tab==='patrol'&&BD.seg==='ai'&&!document.hidden)agLoad()},4000);
+
+
+/* ---------- blueprint ---------- */
+const BPU={file:'',rot:0,timer:0};
+const bpCmd=c=>call('/api/printer/cmd',{bot:$('#bp-bot').value,cmd:c});
+const bpColor=n=>{let h=0;for(const c of n)h=(h*31+c.charCodeAt(0))>>>0;return 'hsl('+(h%360)+','+(45+h%30)+'%,'+(38+h%25)+'%)'};
+async function bpLayer(){
+  const f=$('#bp-file').value;if(!f)return;
+  const y=+$('#bp-ly').value,d=await call('/api/printer/layer?file='+encodeURIComponent(f)+'&y='+y+'&rot='+$('#bp-rot').value);
+  if(!d||!d.success){$('#bp-lt').textContent=(d&&d.msg)||'Gagal memuat pratinjau';return}
+  $('#bp-ly').max=d.size.y-1;
+  $('#bp-lt').textContent='Lapisan '+(y+1)+' dari '+d.size.y+' · ukuran '+d.size.x+'×'+d.size.y+'×'+d.size.z;
+  const cv=$('#bp-cv'),g=cv.getContext('2d'),k=Math.max(2,Math.min(16,Math.floor(320/Math.max(d.size.x,d.size.z))));
+  cv.width=d.size.x*k;cv.height=d.size.z*k;g.clearRect(0,0,cv.width,cv.height);
+  d.rows.forEach((row,z)=>row.forEach((i,x)=>{if(i>=0){g.fillStyle=bpColor(d.names[i]);g.fillRect(x*k,z*k,k-1,k-1)}}));
+  $('#bp-lg').innerHTML=d.names.slice(0,10).map(n=>'<span style="display:inline-block;margin-right:10px"><i style="display:inline-block;width:10px;height:10px;background:'+bpColor(n)+'"></i> '+esc(n)+'</span>').join('');
+}
+async function bpLoad(){
+  const d=await call('/api/printer');if(!d||!d.success)return;
+  const sel=$('#bp-bot'),cur=sel.value;
+  sel.innerHTML=d.bots.map(b=>'<option value="'+esc(b.id)+'">'+esc(b.id)+(b.online?'':' (offline)')+'</option>').join('');
+  if(cur)sel.value=cur;
+  const fs=$('#bp-file'),cf=fs.value;
+  fs.innerHTML=d.files.length?d.files.map(f=>'<option>'+esc(f)+'</option>').join(''):'<option value="">(belum ada file)</option>';
+  if(cf&&d.files.includes(cf))fs.value=cf;
+  const b=d.bots.find(x=>x.id===sel.value)||d.bots[0],s=b&&b.status;
+  if(!s){$('#bp-st').textContent='Bot belum aktif.';return}
+  $('#bp-st').textContent=s.phase+(s.msg?' · '+s.msg:'')+(s.error?' · '+s.error:'');
+  $('#bp-bar').value=s.total?Math.round(s.done*100/s.total):0;
+  if(document.activeElement!==$('#bp-guard'))$('#bp-guard').checked=!!s.guard;
+  $('#bp-info').innerHTML=s.bp?'<div class="li"><b>'+esc(s.bp.name)+'</b> · '+s.bp.size.x+'×'+s.bp.size.y+'×'+s.bp.size.z+' · '+s.bp.blocks+' blok<div class="mu">'+esc(s.file)+(s.origin?'<br>Asal: '+s.origin.x+' '+s.origin.y+' '+s.origin.z+' · rotasi '+s.rot*90+'°':'')+'<br>Peti suplai: '+s.supplyN+' · potret area: '+s.snapN+' blok</div></div>':'';
+  const mats=s.bp?Object.entries(s.bp.materials).sort((a,b)=>b[1]-a[1]):[];
+  const miss=s.missing||{};
+  $('#bp-mat').innerHTML=mats.length?mats.slice(0,40).map(([n,c])=>'<div class="li"><b>'+esc(n)+'</b> <span class="tag '+(miss[n]?'warn':'ok')+'">'+c+(miss[n]?' · kurang':'')+'</span></div>').join(''):'<p class="mu">—</p>';
+  $('#bp-log').innerHTML=s.lines&&s.lines.length?s.lines.slice().reverse().map(l=>'<div class="li mu">'+esc(l)+'</div>').join(''):'<p class="mu">—</p>';
+  if(s.file&&fs.value!==s.file&&d.files.includes(s.file)&&!BPU.touched)fs.value=s.file;
+}
+$('#bp-file').onchange=()=>{BPU.touched=true;$('#bp-ly').value=0;bpLayer()};
+$('#bp-rot').onchange=bpLayer;$('#bp-ly').oninput=bpLayer;
+$('#bp-upgo').onclick=async()=>{
+  const f=$('#bp-up').files[0];if(!f)return toast('Pilih file dulu',true);
+  try{const r=await fetch('/api/printer/upload?name='+encodeURIComponent(f.name),{method:'POST',headers:{'Content-Type':'application/octet-stream'},body:f});const d=await r.json();
+    res(d,d.success?'Diunggah: '+d.blocks+' blok':'');if(d.success){BPU.touched=true;await bpLoad();$('#bp-file').value=d.file;bpLayer()}}
+  catch(e){toast('Unggah gagal',true)}
+};
+$('#bp-load').onclick=async()=>{
+  const f=$('#bp-file').value;if(!f)return toast('Belum ada file',true);
+  const x=$('#bp-x').value,y=$('#bp-y').value,z=$('#bp-z').value,r=$('#bp-rot').value;
+  const at=(x!==''&&y!==''&&z!=='')?' '+x+' '+y+' '+z:' here';
+  let d;
+  if(at===' here'){d=await bpCmd('/bp load '+f);if(d.success)await bpCmd('/bp here');await bpCmd('/bp rot '+r)}
+  else d=await bpCmd('/bp load '+f+at+' '+r);
+  res(d,d.msg||'Dimuat');bpLoad();
+};
+$('#bp-build').onclick=async()=>{res(await bpCmd('/bp build'),'Bot mulai membangun');bpLoad()};
+$('#bp-verify').onclick=async()=>{const d=await bpCmd('/bp verify');res(d,d.msg||'')};
+$('#bp-repair').onclick=async()=>{res(await bpCmd('/repair'),'Memeriksa kerusakan');bpLoad()};
+$('#bp-stop').onclick=async()=>{res(await bpCmd('/bp stop'),'Menghentikan');bpLoad()};
+$('#bp-del').onclick=async()=>{const f=$('#bp-file').value;if(!f||!await ask({title:'Hapus file?',text:f,ok:'Hapus',danger:true}))return;res(await call('/api/printer/delete',{file:f}),'File dihapus');bpLoad()};
+$('#bp-guard').onchange=async e=>{const d=await bpCmd('/bp guard '+(e.target.checked?'on':'off'));res(d,d.msg||'');bpLoad()};
+$('#sp-add').onclick=async()=>{const v=['x','y','z'].map(a=>$('#sp-'+a).value);res(await bpCmd('/supply add '+v.join(' ')),'Peti ditambah');bpLoad()};
+$('#sp-scan').onclick=async()=>{res(await bpCmd('/supply scan'),'Memindai peti');bpLoad()};
+$('#sn-go').onclick=async()=>{const d=await bpCmd('/snapshot '+$('#sn-r').value);res(d,d.msg||'');bpLoad()};
+setInterval(()=>{if(tab==='patrol'&&BD.seg==='bp'&&!document.hidden)bpLoad()},3000);
+
+/* ---------- PvP ---------- */
+const pvCmd=c=>call('/api/pvp/cmd',{bot:$('#pv-bot').value,cmd:c});
+async function pvLoad(){
+  const d=await call('/api/pvp');if(!d||!d.success)return;
+  const sel=$('#pv-bot'),cur=sel.value;
+  sel.innerHTML=d.bots.map(b=>'<option value="'+esc(b.id)+'">'+esc(b.id)+(b.online?'':' (offline)')+'</option>').join('');
+  if(cur)sel.value=cur;
+  if(document.activeElement!==$('#pv-on'))$('#pv-on').checked=!!d.enabled;
+  if(document.activeElement!==$('#pv-rev'))$('#pv-rev').checked=!!d.revenge;
+  const act=d.bots.filter(b=>b.target);
+  $('#pv-st').textContent=act.length?'Bertarung: '+act.map(b=>b.id+' vs '+b.target).join(', '):'Siaga';
+  $('#pv-friends').textContent=d.friends.length?'Teman: '+d.friends.join(', '):'Belum ada teman.';
+  $('#pv-list').innerHTML=d.players.length?d.players.map(r=>'<div class="li"><b>'+esc(r.name)+'</b>'+(r.marked?' <span class="tag warn">musuh</span>':'')+'<div class="mu">membunuh bot '+r.kills+'× · memukul '+r.hits+'× · dikalahkan '+(r.defeated||0)+'× · '+ago(r.last)+'</div><button class="btn sm" data-fg="'+esc(r.name)+'">Maafkan</button></div>').join(''):'<p class="mu">Belum ada catatan.</p>';
+  $$('#pv-list [data-fg]').forEach(b=>b.onclick=async()=>{res(await pvCmd('/forgive '+b.dataset.fg),'Dimaafkan');pvLoad()});
+}
+$('#pv-on').onchange=async e=>{res(await pvCmd('/pvp '+(e.target.checked?'on':'off')),'Tersimpan');pvLoad()};
+$('#pv-rev').onchange=async e=>{res(await pvCmd('/pvp revenge '+(e.target.checked?'on':'off')),'Tersimpan');pvLoad()};
+$('#pv-fadd').onclick=async()=>{const n=$('#pv-fr').value.trim();if(!n)return;res(await pvCmd('/pvp friend add '+n),'Teman ditambah');$('#pv-fr').value='';pvLoad()};
+setInterval(()=>{if(tab==='patrol'&&BD.seg==='pvp'&&!document.hidden)pvLoad()},3000);
 
 addEventListener('hashchange',()=>{const t=location.hash.slice(1);if(t!==tab&&$('#t-'+t))go(t)});
 if('serviceWorker'in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{});
