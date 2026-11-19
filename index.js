@@ -1183,12 +1183,14 @@ app.post("/command", (req, res) => {
     const lines = [
       "/help  /pos  /status  /list  /say <msg>",
       "/goto x y z  /follow <player>  /come <player>  /stop",
+      ...require("./commands").HELP,
       "/<anything> = Minecraft command, plain text = chat",
     ];
     lines.forEach((l) => addLog(`[Console] ${l}`));
     return res.json({ success: true, msg: lines.join("\n") });
   }
 
+  { const nc = require("./commands").run(cmd, targets); if (nc) { nc.forEach((l) => addLog(`[Console] ${l}`)); return res.json({ success: true, msg: nc.join("\n") }); } }
   const mv = require("./extras").command(cmd, targets);
   if (mv) { mv.forEach((l) => addLog(`[Console] ${l}`)); return res.json({ success: true, msg: mv.join("\n") }); }
 
@@ -1870,6 +1872,9 @@ function makeBot(id, account, baseConfig) {
     try { require("./combat2").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Tempur] " + e.message); }
     try { require("./builder").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Bangun] " + e.message); }
     try { require("./agent").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Agen] " + e.message); }
+    try { require("./printer").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Printer] " + e.message); }
+    try { require("./baritone").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[Baritone] " + e.message); }
+    try { require("./pvp").attach(bot, mcData, botState, config, addLog, addInterval); } catch (e) { addLog("[PvP] " + e.message); }
 
     addLog("[Modules] All modules initialized!");
   }

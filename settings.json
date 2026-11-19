@@ -90,5 +90,22 @@
   },
   "chat": {
     "respond": true
+  },
+  "printer": {
+    "radius": 40,
+    "guard": false,
+    "max-wait": 90,
+    "scaffold-clean": true
+  },
+  "pvp": {
+    "enabled": true,
+    "revenge": true,
+    "crits": true,
+    "shield": true,
+    "revenge-radius": 32,
+    "recover-items": true,
+    "flee-hp": 0,
+    "forget-days": 14,
+    "whitelist": []
   }
 }

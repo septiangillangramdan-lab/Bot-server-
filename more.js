@@ -245,4 +245,6 @@ module.exports = function more(app, manager, config, addLog) {
   try { require("./patrol").routes(app, manager, config, addLog); } catch (e) { addLog("[Patroli] rute gagal: " + e.message); }
   try { require("./builder").routes(app, manager, config, addLog); } catch (e) { addLog("[Bangun] rute gagal: " + e.message); }
   try { require("./agent").routes(app, manager, config, addLog); } catch (e) { addLog("[Agen] rute gagal: " + e.message); }
+  try { require("./printer").routes(app, manager, config, addLog); } catch (e) { addLog("[Printer] rute gagal: " + e.message); }
+  try { require("./pvp").routes(app, manager); } catch (e) { addLog("[PvP] rute gagal: " + e.message); }
 };

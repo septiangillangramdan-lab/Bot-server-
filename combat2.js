@@ -3,7 +3,7 @@
 //  - membalas pemain yang baru memukul bot (bila "balas serangan" menyala)
 //  - perintah manual /attack <pemain atau jenis mob>
 //  - memilih senjata terbaik, menyerang sesuai cooldown, mengejar target, kabur saat darah tipis
-// Bot TIDAK berburu pemain sendiri: target pemain hanya karena diserang atau karena perintah.
+// Pemain dilawan lewat pvp.js (gaya HeroBot) bila aktif; file ini mengurus mob dan cadangan tanpa pvp.js.
 const { goals, Movements } = require("mineflayer-pathfinder");
 const { GoalFollow, GoalInvert } = goals;
 const human = require("./human");
@@ -73,7 +73,7 @@ function attach(bot, mcData, botState, config, log, addInterval) {
           const d = dist(e), sw = st.swings.get(e.id) || 0;
           if (d < bd && now - sw < 900) { bd = d; best = e; }
         }
-        if (best) start(best, "membalas serangan", 45000);
+        if (best) { if (botState.pvp && botState.pvp.enabled && botState.pvpEngage) botState.pvpEngage(best, "membalas serangan"); else start(best, "membalas serangan", 45000); }
       }
       st.lastHp = hp;
     } catch (e) {}
@@ -95,6 +95,7 @@ function attach(bot, mcData, botState, config, log, addInterval) {
       }
     }
     if (!t) return `"${query}" tidak terlihat (harus berada dalam jangkauan bot)`;
+    if (t.type === "player" && botState.pvp && botState.pvp.enabled && botState.pvpEngage) return botState.pvpEngage(t, "perintah manual") ? `menyerang ${nameOf(t)}` : "gagal memulai";
     return start(t, "perintah manual", 120000) ? `menyerang ${nameOf(t)}` : "gagal memulai";
   };
   botState.stopFight = () => { stop("dihentikan"); };
